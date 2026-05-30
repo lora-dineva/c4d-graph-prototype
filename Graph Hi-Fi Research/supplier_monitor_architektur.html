@@ -1,0 +1,1978 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>N-tier Supplier Monitor - Architecture &amp; Project Outline</title>
+<style>
+  :root {
+    --c-bg: #fafafa;
+    --c-text: #1a1a1a;
+    --c-muted: #555;
+    --c-border: #d0d0d0;
+    --c-accent: #4a148c;
+    --c-accent-light: #f3e5f5;
+    --c-accent-mid: #9c27b0;
+    --c-input: #1565c0;
+    --c-input-light: #e3f2fd;
+    --c-ai: #2e7d32;
+    --c-ai-light: #e8f5e9;
+    --c-gui: #c62828;
+    --c-gui-light: #ffebee;
+    --c-gov: #ef6c00;
+    --c-gov-light: #fff3e0;
+    --c-highlight: #fff59d;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    color: var(--c-text);
+    background: var(--c-bg);
+    line-height: 1.55;
+  }
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--c-accent); color: #fff;
+    padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .topbar h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  .topbar a {
+    color: #fff; text-decoration: none;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 14px; border-radius: 4px;
+    font-size: 13px;
+  }
+  .topbar a:hover { background: rgba(255,255,255,0.3); }
+
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* ---------- Architecture diagram (v2 â€” closer to PNG) ---------- */
+  .arch {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 32px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .arch-banner {
+    background: linear-gradient(90deg, #4a148c 0%, #6a1b9a 60%, #8e24aa 100%);
+    color: #fff;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .arch-banner h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: 0.2px; }
+  .arch-banner .sub { margin-top: 3px; font-size: 12.5px; opacity: 0.92; }
+
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr 1fr;
+    gap: 12px;
+  }
+  .arch-col {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+  }
+  .arch-col.inputs { border-color: #5e35b1; }
+  .arch-col.ai     { border-color: #00897b; }
+  .arch-col.gui    { border-color: #f57c00; }
+
+  .arch-col-header {
+    color: #fff;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .arch-col.inputs .arch-col-header { background: #5e35b1; }
+  .arch-col.ai     .arch-col-header { background: #00897b; }
+  .arch-col.gui    .arch-col-header { background: #f57c00; }
+
+  .arch-col-body {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+  .arch-col.inputs .arch-col-body { background: #ede7f6; }
+  .arch-col.ai     .arch-col-body { background: #e0f2f1; }
+  .arch-col.gui    .arch-col-body { background: #fff3e0; }
+
+  .arch-group {
+    background: #fff;
+    border-radius: 6px;
+    padding: 8px 10px;
+    border: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .arch-group-title {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin: 0 0 6px 0;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .arch-group-title a {
+    text-decoration: none;
+    color: inherit;
+  }
+  .arch-group-title a:hover { text-decoration: underline; }
+  .arch-col.inputs .arch-group-title { color: #4527a0; }
+
+  .arch-items {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .arch-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 8px;
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    border-radius: 4px;
+    font-size: 11.5px;
+    color: #2a2a2a;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    line-height: 1.3;
+  }
+  .arch-item:hover {
+    background: #fff8e1;
+    border-color: #ffb300;
+    transform: translateX(2px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .arch-item .ico {
+    font-size: 13px;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+  }
+
+  /* AI-layer + GUI: bigger flat cards, no group nesting */
+  .arch-col.ai .arch-col-body, .arch-col.gui .arch-col-body { gap: 7px; }
+  .arch-col.ai .arch-item, .arch-col.gui .arch-item {
+    padding: 9px 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    background: #fff;
+  }
+  .arch-col.ai .arch-item  { border-color: #80cbc4; }
+  .arch-col.gui .arch-item { border-color: #ffb74d; }
+  .arch-col.ai .arch-item:hover  { background: #00897b; color: #fff; border-color: #00695c; }
+  .arch-col.gui .arch-item:hover { background: #f57c00; color: #fff; border-color: #e65100; }
+
+  .arch-result {
+    margin-top: auto;
+    padding: 8px 10px;
+    border-top: 1px dashed #ffb74d;
+    font-size: 11px;
+    font-style: italic;
+    color: #6d4c00;
+    text-align: center;
+    background: rgba(255,255,255,0.5);
+  }
+
+  .arch-governance {
+    margin-top: 12px;
+    background: #fff8f0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    border: 2px solid #ef6c00;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .arch-governance .gov-label {
+    font-weight: 800; color: #e65100;
+    text-transform: uppercase; font-size: 11.5px; letter-spacing: 0.4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .arch-governance a {
+    text-decoration: none;
+    background: #fff; color: #e65100;
+    padding: 4px 10px; border-radius: 14px;
+    font-size: 11.5px; font-weight: 600;
+    border: 1px solid #ef6c00;
+    transition: all 0.15s;
+  }
+  .arch-governance a:hover { background: #ef6c00; color: #fff; }
+
+  .arch-flow {
+    text-align: center;
+    color: #555;
+    font-size: 11px;
+    margin: 12px 0 6px 0;
+    font-style: italic;
+  }
+  .arch-flow .arr { color: #5e35b1; font-weight: bold; }
+
+  .arch-tags {
+    display: flex; justify-content: center; gap: 10px;
+    margin-top: 10px; flex-wrap: wrap;
+  }
+  .arch-tags a {
+    color: #4a148c;
+    text-decoration: none;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: #f3e5f5;
+    border: 1px solid #ce93d8;
+    padding: 5px 14px;
+    border-radius: 16px;
+    transition: all 0.15s;
+  }
+  .arch-tags a:hover { background: #4a148c; color: #fff; border-color: #4a148c; }
+
+/* PNG-style architecture */
+.arch-png{background:#fff;border:0;border-radius:0;padding:8px 0 0;box-shadow:none}.arch-png .svg-defs{position:absolute;width:0;height:0;overflow:hidden}.png-title{margin:0 0 12px}.png-title h2{margin:0;color:#070d2c;font-size:clamp(30px,4vw,48px);line-height:1.02;font-weight:800;letter-spacing:0}.png-title p{margin:4px 0 0;color:#006b68;font-size:clamp(17px,1.8vw,25px);line-height:1.15;font-weight:750}.png-board-grid{display:grid;grid-template-columns:.95fr 42px 1.58fr 42px 1.14fr;gap:8px;align-items:stretch}.png-panel{border:1.5px solid #173763;border-radius:8px;overflow:hidden;background:#fff;min-width:0}.png-panel-head{display:block;background:linear-gradient(180deg,#082b63,#051f4d);color:#fff;text-align:center;font-size:20px;line-height:1.1;font-weight:800;text-decoration:none;padding:9px 12px}.png-panel-head:hover{background:linear-gradient(180deg,#0b397f,#062966)}.png-panel-body{padding:10px 12px 12px}.png-source-card{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;align-items:center;min-height:120px;border:1.4px solid #516c91;border-radius:7px;background:linear-gradient(180deg,#fff,#fbfdff);padding:10px 12px;margin-bottom:9px;transition:.16s}.png-source-card.challenge{min-height:72px;background:linear-gradient(180deg,#f8fbff,#eaf3fb);margin-bottom:0}.png-source-card:hover,.png-step:hover,.png-output-card:hover{border-color:#00746f;box-shadow:0 4px 14px rgba(0,67,80,.16);transform:translateY(-1px)}.png-card-icon{display:flex;align-items:center;justify-content:center;color:#062a61;text-decoration:none}.png-card-icon svg{width:66px;height:66px;stroke-width:2.1}.png-card-title{color:#061f50;font-size:17px;line-height:1.12;font-weight:800;text-decoration:none}.png-card-title:hover,.png-source-card li a:hover,.png-gov-panel a:hover,.png-footer a:hover{color:#00746f;text-decoration:underline}.png-source-card ul{list-style:disc;margin:4px 0 0 18px;padding:0}.png-source-card li{margin:0;color:#071333;line-height:1.28;font-size:13.5px}.png-source-card li a,.png-gov-panel a,.png-footer a{color:inherit;text-decoration:none}.png-arrow{display:flex;align-items:center;justify-content:center;color:#092f69}.png-arrow svg{width:42px;height:60px;fill:currentColor}.png-ai-layout{display:grid;grid-template-columns:minmax(0,1fr) 142px;gap:10px}.png-ai-flow{display:flex;flex-direction:column;gap:9px}.png-step{display:grid;grid-template-columns:47px minmax(0,1fr);align-items:center;gap:10px;min-height:64px;border:1.4px solid #516c91;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfdff);padding:9px 12px;color:#071333;text-decoration:none;position:relative;transition:.16s}.png-step:not(:last-child)::after{content:"";position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:9px solid #062a61;z-index:2}.png-step-badge{width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#00746f;color:#fff;font-weight:850;font-size:19px}.png-step strong{display:block;color:#061f50;font-size:15.5px;line-height:1.12;margin-bottom:3px}.png-step span.desc{display:block;font-size:12.8px;line-height:1.2}.png-gov-panel{border:1.5px solid #00746f;border-radius:9px;padding:12px 11px;display:flex;flex-direction:column;align-items:center;justify-content:space-around;min-height:100%;color:#061f50}.png-gov-title{color:#00746f;font-size:15px;line-height:1.22;font-weight:800;text-align:center;margin-bottom:8px}.png-gov-item{width:100%;border-top:1px solid #b8c5d4;padding:10px 0 9px;text-align:center;font-size:12.5px;line-height:1.25}.png-gov-item svg{width:38px;height:38px;display:block;margin:0 auto 4px;color:#062a61;stroke-width:2}.png-gui-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.png-output-card{min-height:132px;border:1.4px solid #516c91;border-radius:7px;background:linear-gradient(180deg,#fff,#fbfdff);padding:14px 12px;display:grid;grid-template-columns:58px minmax(0,1fr);gap:10px;align-items:center;color:#071333;text-decoration:none;transition:.16s}.png-output-card svg{width:54px;height:54px;color:#062a61;stroke-width:2}.png-output-card:nth-child(3) svg,.png-output-card:nth-child(5) svg,.png-result svg{color:#00746f}.png-output-card strong{display:block;color:#061f50;font-size:16px;line-height:1.12;margin-bottom:8px}.png-output-card span{display:block;font-size:12.7px;line-height:1.25}.png-result{grid-column:1/-1;min-height:88px;border-color:#00746f;background:linear-gradient(180deg,#f8fffe,#e8f6f4)}.png-result strong{color:#00746f;font-size:17px;line-height:1.18}.png-footer{margin-top:14px;border:1.5px solid #173763;border-radius:7px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-height:64px;overflow:hidden}.png-footer a{display:flex;align-items:center;justify-content:center;gap:16px;padding:12px 18px;color:#061f50;font-size:16px;font-weight:800;border-right:1px solid #173763;background:#fff}.png-footer a:last-child{border-right:0}.png-footer svg{width:44px;height:44px;color:#062a61;stroke-width:2}.entity-index{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0 20px}.entity-index a{display:block;border:1px solid var(--c-border);border-left:4px solid #00746f;border-radius:6px;padding:8px 10px;color:#14305a;background:#fbfdff;text-decoration:none;font-size:13px;font-weight:650}.entity-index a:hover{background:#edf8f6;text-decoration:underline}.entity-note{border-left:4px solid #00746f;background:#f2fbfa;padding:9px 12px;margin:8px 0 12px;font-size:13px}.entity-detail h3{border-top:1px solid #e4e8ef;padding-top:14px}.entity-detail .todo{color:#6d4c00;background:#fff8e1;border-left:3px solid #ffb300;padding:6px 9px;margin:8px 0;font-size:13px}
+  .mini-assessment {
+    margin: 8px 0;
+    padding: 8px 10px;
+    border: 1px solid #c5d2e2;
+    border-left: 4px solid #00746f;
+    border-radius: 6px;
+    background: #f4fbfa;
+    font-size: 13px;
+  }
+  .mini-assessment p {
+    margin: 4px 0;
+  }
+  .mini-assessment ul {
+    margin: 4px 0 6px 18px;
+    padding: 0;
+  }
+  .mini-assessment li {
+    margin: 2px 0;
+  }
+@media(max-width:1200px){.png-board-grid{grid-template-columns:1fr}.png-arrow{height:36px;transform:rotate(90deg)}.png-ai-layout{grid-template-columns:1fr}.png-gov-panel{flex-direction:row;flex-wrap:wrap;gap:8px}.png-gov-title,.png-gov-item{width:auto;flex:1 1 135px;border-top:0}}@media(max-width:700px){.png-title h2{font-size:29px}.png-source-card,.png-output-card{grid-template-columns:58px minmax(0,1fr)}.png-card-icon svg{width:48px;height:48px}.png-gui-grid,.png-footer,.entity-index{grid-template-columns:1fr}.png-footer a{border-right:0;border-bottom:1px solid #173763}.png-footer a:last-child{border-bottom:0}}
+
+
+  /* ---------- Document content ---------- */
+  .content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px 40px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .content h1 {
+    font-size: 28px; margin: 0 0 4px 0;
+    color: var(--c-accent);
+  }
+  .content h1 + p.lead { color: var(--c-muted); font-size: 16px; margin: 0 0 24px 0; }
+  .content h2 {
+    font-size: 22px; margin: 32px 0 12px 0;
+    color: var(--c-accent);
+    border-bottom: 2px solid var(--c-accent-light);
+    padding-bottom: 6px;
+  }
+  .content h3 {
+    font-size: 17px; margin: 22px 0 8px 0;
+    color: #333;
+  }
+  .content h4 {
+    font-size: 15px; margin: 16px 0 6px 0;
+    color: #444;
+  }
+  .content p { margin: 8px 0; }
+  .content ul, .content ol { margin: 8px 0; padding-left: 24px; }
+  .content li { margin: 3px 0; }
+  .content blockquote {
+    border-left: 4px solid var(--c-accent-mid);
+    margin: 12px 0; padding: 8px 16px;
+    background: var(--c-accent-light);
+    font-style: italic;
+    color: #333;
+  }
+  .content table {
+    border-collapse: collapse;
+    margin: 12px 0;
+    width: 100%;
+    font-size: 13px;
+  }
+  .content th, .content td {
+    border: 1px solid var(--c-border);
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .content th {
+    background: var(--c-accent-light);
+    font-weight: 700;
+    color: var(--c-accent);
+  }
+  .content tr.target-flash {
+    animation: flash 1.6s ease-out;
+  }
+  .content section.target-flash > h2,
+  .content section.target-flash > h3,
+  .content div.target-flash {
+    animation: flash 1.6s ease-out;
+  }
+  @keyframes flash {
+    0% { background: var(--c-highlight); }
+    100% { background: transparent; }
+  }
+  .content code {
+    font-family: "Cascadia Code", Consolas, monospace;
+    background: #f5f5f5;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  .content pre {
+    background: #f5f5f5;
+    border: 1px solid var(--c-border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    font-size: 13px;
+  }
+  .content hr {
+    border: none;
+    border-top: 1px solid var(--c-border);
+    margin: 28px 0;
+  }
+  .meta-block {
+    background: #fafafa;
+    border-left: 4px solid var(--c-accent);
+    padding: 10px 16px;
+    margin: 12px 0 24px 0;
+    font-size: 14px;
+  }
+  .meta-block strong { color: var(--c-accent); }
+
+  @media (max-width: 900px) {
+    .arch-cols { grid-template-columns: 1fr; }
+    .content { padding: 20px; }
+  }
+  @media print {
+    .topbar { position: static; }
+    .arch { background: #fff; color: #000; border: 1px solid #999; }
+    .arch-title, .arch-subtitle, .arch-flow, .arch-tags a { color: #000; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>N-tier Supplier Monitor - Management Project Outline v0.9</h1>
+  <p class="brand-origin" style="margin:4px 0 12px;color:#546070;font-weight:700;">N-tier Supplier Monitor is a joint offering from C4D and Wiser.</p>
+  <a href="#architektur">Architecture</a>
+</div>
+
+<div class="wrap">
+
+<!-- ============ ARCHITECTURE DIAGRAM ============ -->
+<section id="architektur" class="arch arch-png">
+  <svg class="svg-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-database" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="32" cy="14" rx="20" ry="8"><path d="M12 14v28c0 4.4 9 8 20 8s20-3.6 20-8V14"><path d="M12 28c0 4.4 9 8 20 8s20-3.6 20-8"><path d="M12 41c0 4.4 9 8 20 8s20-3.6 20-8"></g></symbol>
+    <symbol id="i-globe" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="32" r="25"><path d="M7 32h50M32 7c7 7.5 11 16 11 25S39 49.5 32 57M32 7c-7 7.5-11 16-11 25s4 17.5 11 25M12 20h40M12 44h40"></g></symbol>
+    <symbol id="i-network" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="12" r="7"><circle cx="14" cy="49" r="7"><circle cx="50" cy="49" r="7"><path d="M29 18 18 43M35 18l11 25M21 49h22"></g></symbol>
+    <symbol id="i-satellite" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 44c10-2 17-9 19-19L24 12C14 17 9 26 8 36l10 8Z"><path d="M37 25l10-10M43 9l12-5M48 14l10 2M21 47l-6 10M29 40l12 12M40 51l10 5"><path d="M43 21c4 1 7 4 8 8M49 15c7 2 12 7 14 14"></g></symbol>
+    <symbol id="i-target" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="32" r="25"><circle cx="32" cy="32" r="15"><circle cx="32" cy="32" r="5"><path d="M40 24 54 10M45 10h9v9"></g></symbol>
+    <symbol id="i-shield" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M32 6 53 15v16c0 14-8 23-21 28C19 54 11 45 11 31V15l21-9Z"><path d="m21 32 7 7 16-18"></g></symbol>
+    <symbol id="i-user" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="21" r="11"><path d="M12 55c3-13 12-20 20-20s17 7 20 20"></g></symbol>
+    <symbol id="i-clipboard" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10h20l3 6h7v41H12V16h7l3-6Z"><path d="M22 16h20M22 29h20M22 40h20M22 51h13"></g></symbol>
+    <symbol id="i-scale" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M32 10v44M16 54h32M10 22h44M18 22 9 42h18L18 22ZM46 22l-9 20h18l-9-20Z"></g></symbol>
+    <symbol id="i-factory" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 55V29l15 8V27l15 10V21h13v34H8Z"><path d="M17 55V44h8v11M34 55V44h8v11M50 21v-9h-8v9"></g></symbol>
+    <symbol id="i-graph" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="32" r="6"><circle cx="32" cy="13" r="6"><circle cx="48" cy="32" r="6"><circle cx="32" cy="51" r="6"><path d="M20 27 28 18M36 18l8 9M44 37l-8 9M28 46l-8-9M22 32h20"></g></symbol>
+    <symbol id="i-bell" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 43V28c0-8 6-15 14-15s14 7 14 15v15l6 8H12l6-8Z"><path d="M26 53c1 4 3 6 6 6s5-2 6-6"></g></symbol>
+    <symbol id="i-chat" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14h44v31H25L12 55V45H10V14Z"><path d="M20 28h24M20 37h15"></g></symbol>
+    <symbol id="i-brain" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M22 15c-6 0-11 5-11 11 0 3 1 5 3 7-3 2-5 5-5 9 0 6 5 10 11 10h24c6 0 11-4 11-10 0-4-2-7-5-9 2-2 3-4 3-7 0-6-5-11-11-11-2-5-6-8-11-8s-9 3-11 8Z"><path d="M31 8v44M21 25h10M33 25h10M22 39h20"></g></symbol>
+    <symbol id="i-cubes" viewbox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m32 5 13 7-13 7-13-7 13-7ZM12 30l13 7-13 7-13-7 13-7ZM52 30l13 7-13 7-13-7 13-7ZM32 45l13 7-13 7-13-7 13-7Z"></g></symbol>
+  </svg>
+
+  <header class="png-title"><h2>N-tier Supplier Monitor Target Architecture</h2><p>From data space to risk and decision intelligence</p></header>
+  <div class="png-board"><div class="png-board-grid">
+    <div class="png-panel"><a class="png-panel-head" href="#detail-inputs">Inputs / data sources</a><div class="png-panel-body">
+      <div class="png-source-card"><a class="png-card-icon" href="#detail-interne-oem-daten"><svg><use href="#i-database"></use></svg></a><div><a class="png-card-title" href="#detail-interne-oem-daten">Internal OEM data</a><ul><li><a href="#detail-sap-erp">SAP / ERP</a></li><li><a href="#detail-lieferantenstamm">Supplier master data</a></li><li><a href="#detail-stuecklisten">Bills of material / part usage</a></li><li><a href="#detail-programme-werke">Programs / plants</a></li><li><a href="#detail-qualitaet-audits">Quality / audits</a></li><li><a href="#detail-logistik-abrufe">Logistics / call-offs</a></li></ul></div></div>
+      <div class="png-source-card"><a class="png-card-icon" href="#detail-externe-daten"><svg><use href="#i-globe"></use></svg></a><div><a class="png-card-title" href="#detail-externe-daten">External data</a><ul><li><a href="#detail-handelsregister">Commercial registers / owners</a></li><li><a href="#detail-finanzdaten">Financial data / ratings</a></li><li><a href="#detail-news-medien">News / media</a></li><li><a href="#detail-esg-sanktionen">ESG / sanctions</a></li><li><a href="#detail-patente-hiring">Patents / hiring</a></li><li><a href="#detail-geo-event-daten">Geo / event data</a></li></ul></div></div>
+      <div class="png-source-card"><a class="png-card-icon" href="#detail-oekosystem-partner"><svg><use href="#i-network"></use></svg></a><div><a class="png-card-title" href="#detail-oekosystem-partner">Ecosystem / partners</a><ul><li><a href="#detail-catena-x">Catena-X</a></li><li><a href="#detail-lieferantenportale">Supplier portals</a></li><li><a href="#detail-bloomberg-orbis-db">Bloomberg / Orbis / D&amp;B</a></li><li><a href="#detail-tracking-transportdaten">Tracking / transport data</a></li></ul></div></div>
+      <div class="png-source-card"><a class="png-card-icon" href="#detail-beobachtungsdaten"><svg><use href="#i-satellite"></use></svg></a><div><a class="png-card-title" href="#detail-beobachtungsdaten">Observation data</a><ul><li><a href="#detail-satellit-parkplatz">Satellite / parking</a></li><li><a href="#detail-web-social-lokalpresse">Web / social / local press</a></li></ul></div></div>
+      <div class="png-source-card challenge"><a class="png-card-icon" href="#detail-zentrale-herausforderung"><svg><use href="#i-target"></use></svg></a><div><a class="png-card-title" href="#detail-zentrale-herausforderung">Core challenge</a><p style="margin:4px 0 0;font-size:12.6px;line-height:1.25;">heterogeneous data, different identities, different update cycles</p></div></div>
+    </div></div>
+
+    <div class="png-arrow" aria-hidden="true"><svg viewbox="0 0 64 88"><path d="M4 27h32V9l24 35-24 35V61H4Z"></svg></div>
+
+    <div class="png-panel"><a class="png-panel-head" href="#detail-ai-layer">Processing / AI layer</a><div class="png-panel-body"><div class="png-ai-layout"><div class="png-ai-flow">
+      <a class="png-step" href="#detail-ingestion-normalisierung"><span class="png-step-badge">A</span><span><strong>Ingestion &amp; normalization</strong><span class="desc">ETL / APIs / streaming / document ingestion</span></span></a>
+      <a class="png-step" href="#detail-entity-resolution"><span class="png-step-badge">B</span><span><strong>Entity Resolution &amp; Supplier Golden Record</strong><span class="desc">Legal entity matching, DUNS / LEI / commercial register numbers, site mapping</span></span></a>
+      <a class="png-step" href="#detail-knowledge-graph"><span class="png-step-badge">C</span><span><strong>Supply Chain Knowledge Graph</strong><span class="desc">Supplier - site - part - assembly - plant - program - owner - Tier 2 / Tier 3</span></span></a>
+      <a class="png-step" href="#detail-risk-engine"><span class="png-step-badge">D</span><span><strong>Risk Engine</strong><span class="desc">Financial, Operational, Quality, Compliance, Geo, Innovation</span></span></a>
+      <a class="png-step" href="#detail-impact-path-tracing"><span class="png-step-badge">E</span><span><strong>Impact Path Tracing</strong><span class="desc">Which risks affect which parts, assemblies, plants, vehicles, and programs?</span></span></a>
+      <a class="png-step" href="#detail-ai-services"><span class="png-step-badge">F</span><span><strong>AI Services</strong><span class="desc">Data Extraction, Risk Reasoning, Forecasting, Decision Copilot</span></span></a>
+      <a class="png-step" href="#detail-caching-orchestrierung"><span class="png-step-badge">G</span><span><strong>Caching &amp; analysis orchestration</strong><span class="desc">10s response time for the UI; deep research and simulation runs handled asynchronously and pre-aggregated</span></span></a>
+    </div><div class="png-gov-panel">
+      <a class="png-gov-title" href="#detail-governance-security">Governance<br>&amp; Security</a>
+      <a class="png-gov-item" href="#detail-rechte-rollen"><svg><use href="#i-shield"></use></svg>Roles &amp; rights</a>
+      <a class="png-gov-item" href="#detail-audit-trail"><svg><use href="#i-clipboard"></use></svg>Audit Trail</a>
+      <a class="png-gov-item" href="#detail-human-in-loop"><svg><use href="#i-user"></use></svg>Human-in-the-loop</a>
+      <a class="png-gov-item" href="#detail-datenqualitaet"><svg><use href="#i-database"></use></svg>Data quality</a>
+      <a class="png-gov-item" href="#detail-compliance"><svg><use href="#i-scale"></use></svg>Compliance</a>
+    </div></div></div></div>
+
+    <div class="png-arrow" aria-hidden="true"><svg viewbox="0 0 64 88"><path d="M4 27h32V9l24 35-24 35V61H4Z"></svg></div>
+
+    <div class="png-panel"><a class="png-panel-head" href="#detail-gui-outputs">GUI / UI outputs</a><div class="png-panel-body"><div class="png-gui-grid">
+      <a class="png-output-card" href="#detail-global-risk-map"><svg><use href="#i-globe"></use></svg><span><strong>Global Risk Map</strong><span>Heat map of supplier and site risks</span></span></a>
+      <a class="png-output-card" href="#detail-supplier-360"><svg><use href="#i-user"></use></svg><span><strong>Supplier 360</strong><span>Finance, owners, quality, news, actions</span></span></a>
+      <a class="png-output-card" href="#detail-impact-view"><svg><use href="#i-factory"></use></svg><span><strong>Impact View</strong><span>Affected parts, assemblies, plants, programs</span></span></a>
+      <a class="png-output-card" href="#detail-graph-explorer"><svg><use href="#i-graph"></use></svg><span><strong>Graph Explorer</strong><span>N-tier network and dependencies</span></span></a>
+      <a class="png-output-card" href="#detail-alert-cockpit"><svg><use href="#i-bell"></use></svg><span><strong>Alert Cockpit</strong><span>Early warnings, escalations, action status</span></span></a>
+      <a class="png-output-card" href="#detail-action-workspace"><svg><use href="#i-chat"></use></svg><span><strong>Action Workspace</strong><span>Chat, reports, action recommendations, documents</span></span></a>
+      <a class="png-output-card png-result" href="#detail-ergebnis"><svg><use href="#i-target"></use></svg><span><strong>Result:<br>Decision-ready risk intelligence instead of isolated data sources.</strong></span></a>
+    </div></div></div>
+  </div>
+  <div class="png-footer"><a href="#detail-n-tier"><svg><use href="#i-shield"></use></svg>N-tier capable up to Tier 3 in the MVP</a><a href="#detail-ai-plattform"><svg><use href="#i-brain"></use></svg>Part of the AI platform</a><a href="#detail-modular-vendor-agnostisch"><svg><use href="#i-cubes"></use></svg>Modular &amp; vendor-agnostic</a></div>
+  </div>
+</section>
+
+
+<!-- ============ DOCUMENT CONTENT ============ -->
+<article class="content">
+
+<h1>N-tier Supplier Monitor</h1>
+<p class="lead">Management Project Outline for an Automotive OEM</p>
+
+<div class="meta-block">
+  <strong>Version:</strong> 0.9  Â· 
+  <strong>Date:</strong> 05.05.2026  Â· 
+  <strong>Purpose:</strong> Lean, management-ready project outline as a basis for RFI, pitch, internal alignment, and budget/project decisions.<br>
+  <strong>Canonical source:</strong> <code>supplier_monitor_architektur_review_projektskizze.md</code> remains the detailed long-form source for architecture details, vendor research, sources, technical rationale, and knowledge management.
+</div>
+
+<section id="kap-1">
+<h2>1. Introduction: why a specialized partner still makes sense</h2>
+<p>An automotive OEM should not treat the N-tier Supplier Monitor as another dashboard or isolated AI chatbot. The target product is the N-tier Supplier Monitor, connecting existing systems, external risk data, partner data, and an OEM-specific supply-chain knowledge graph.</p>
+<p>The market offers strong point solutions: SAP, Celonis, Bloomberg, Catena-X, Prewave, Resilinc, Exiger, Sphera, and others provide data, processes, risk indicators, news, networks, or supply-chain visibility. What rarely exists as a finished standard solution is the OEM-specific linkage of <strong>supplier risk, the N-tier graph, part usage, vehicle architecture, plants, programs, Catena-X, internal escalation processes, and management decisions</strong>.</p>
+<p>The competitive value is created inside the OEM linkage: which exact part is affected, in which assembly, in which vehicle, in which plant, with which SOP/EOP risk, and with which realistic mitigation option?</p>
+<p>A focused software partner can act as a neutral orchestrator. It does not replace existing platforms; it connects them into a decision-ready risk-intelligence layer. Management consulting is needed to define use cases, governance, roles, escalation logic, and the business case. Engineering capability is needed because supplier risk only becomes actionable when its impact on parts, variants, assemblies, platforms, plants, and programs is traceable.</p>
+<p id="tag-modular">The target model must be consciously <strong>vendor-agnostic, modular, and exit-capable</strong> by design. The strategic positioning is therefore:</p>
+<blockquote>Existing systems are not replaced. They are made decision-ready through an OEM-specific supplier-impact graph and AI-supported risk management.</blockquote>
+</section>
+
+<hr>
+
+<section id="kap-2">
+<h2>2. Executive Summary and Decision Proposal</h2>
+
+<h3 id="kap-2-1">2.1 Core message</h3>
+<p>The N-tier Supplier Monitor should not be built as another dashboard or an isolated AI chat. It makes sense as <strong>N-tier Supplier Monitor</strong> as part of the corporate AI platform. It connects internal OEM data, external risk and company data, partner data from Catena-X, and a supply-chain knowledge graph.</p>
+<p>The core is not displaying risks, but <strong>traceable impact analysis</strong>:</p>
+<blockquote>From a risk event through supplier, site, owner, Tier 2/Tier 3 relationships, and part to assembly, plant, vehicle program, and action.</blockquote>
+
+<h3 id="kap-2-2">2.2 Recommended decision</h3>
+<p>The OEM should start a staged implementation:</p>
+<ol>
+  <li><strong>Exploration and Product Definition</strong> to clarify use cases, data access, architecture, governance, and the make/buy/partner strategy.</li>
+  <li><strong>Data Foundation</strong> with Supplier Golden Record, entity resolution, and first internal/external data integrations.</li>
+  <li><strong>MVP up to Tier 3</strong> for selected critical commodity groups, programs, and plants.</li>
+  <li><strong>Pilot and scaling</strong> with measurable business KPIs, user feedback, and an operating model.</li>
+</ol>
+
+<h3 id="kap-2-3">2.3 Guiding build decisions</h3>
+<table>
+  <thead><tr><th>Capability</th><th>Recommendation</th></tr></thead>
+  <tbody>
+    <tr><td>Market, financial, register, news, and sanctions data</td><td>Buy / connect</td></tr>
+    <tr><td>Catena-X and partner data spaces</td><td>Integrate</td></tr>
+    <tr><td>Supplier Golden Record</td><td>Build and own as an OEM-specific capability</td></tr>
+    <tr><td>BOM / part / plant / program impact</td><td>Build and own as an OEM-specific capability</td></tr>
+    <tr><td>Knowledge Graph and Impact Path Tracing</td><td>Core capability; do not outsource completely</td></tr>
+    <tr id="tag-aiplatform"><td>AI copilot, RAG, agents, model operations</td><td>Build on the corporate AI platform</td></tr>
+    <tr><td>UI and workflow</td><td>Build modularly and integrate into existing workflows where possible</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr>
+
+<section id="kap-3">
+<h2>3. Target State, Scope, and Boundaries</h2>
+
+<h3 id="kap-3-1">3.1 Target state</h3>
+<p>For purchasing, quality, logistics, engineering, finance, compliance, and management, the platform answers the central question:</p>
+<blockquote>Which suppliers, sites, parts, assemblies, plants, and programs are at risk, why, how severely, since when, with what chain effect, and with which response options?</blockquote>
+
+<h3 id="kap-3-2">3.2 Target architecture</h3>
+<p>The target architecture is N-tier capable. This means the data model must not have a hard limit at Tier 3. For the project, however, the first productive scope is intentionally limited.</p>
+
+<h3 id="kap-3-3">3.3 MVP scope</h3>
+<p id="tag-ntier">The MVP focuses on <strong>Tier 1 to Tier 3</strong> for selected critical areas.</p>
+<p>Recommended MVP cut:</p>
+<ul>
+  <li>300 to 500 critical suppliers in the initial scope</li>
+  <li>3 to 5 critical commodity groups or component clusters</li>
+  <li>2 to 3 plants or production clusters</li>
+  <li>2 to 3 vehicle programs or platforms</li>
+  <li>Tier 1 fully in scope; Tier 2 and Tier 3 selectively for critical paths</li>
+  <li>Core risks: financial, ownership, operational, quality, geo/compliance</li>
+  <li>Core modules: Supplier 360, Impact View, Alert Cockpit, Graph Explorer Light</li>
+</ul>
+
+<h3 id="kap-3-4">3.4 Out of scope in the MVP</h3>
+<p>The MVP should not include:</p>
+<ul>
+  <li>full global N-tier coverage</li>
+  <li>complete replacement of existing SAP, Celonis, Bloomberg, or SCRM solutions</li>
+  <li>autonomous AI decisions without human approval</li>
+  <li>fully automated supplier release or alternate supplier selection</li>
+  <li>full Catena-X industrialization across all partners</li>
+  <li>full vehicle architecture visualization across all variants</li>
+  <li>legally sensitive observation data such as parking or satellite signals as a core function</li>
+  <li>full ESG/PCF proof across the entire supply chain</li>
+</ul>
+
+<h3 id="kap-3-5">3.5 Assumptions</h3>
+<p>This project outline is based on the following assumptions:</p>
+<ul>
+  <li>The OEM has relevant internal data on suppliers, parts, plants, programs, quality events, and delivery performance.</li>
+  <li>Some of this data is not yet cleanly connected across system boundaries.</li>
+  <li>The corporate AI platform provides or will provide models, RAG, logging, governance, and security components.</li>
+  <li>Interactive UI queries should return within roughly 10 seconds. Deep research and simulation runs are asynchronous, cached, or pre-aggregated.</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-4">
+<h2>4. Target Architecture on One Page</h2>
+
+<h3 id="kap-4-1">4.1 Architecture in words</h3>
+<p>The platform consists of three main areas:</p>
+<pre>Inputs / data sources â†’ Processing / AI layer â†’ GUI / UI outputs and decision workflows</pre>
+
+<h3 id="kap-4-2">4.2 Inputs and data sources</h3>
+<p>The input side combines four source types:</p>
+<ol>
+  <li id="input-intern"><strong>Internal OEM data</strong><br>
+    Supplier master data, SAP/ERP, purchase orders, call-offs, BOMs, part usage, plants, vehicle programs, quality data, audit reports, logistics data, contracts, and escalation history.</li>
+  <li id="input-extern"><strong>External data</strong><br>
+    Commercial registers, company registers, ownership structures, financial data, ratings, insolvency signals, news, ESG, sanctions, geopolitical events, <span id="src-patente">patents</span>, hiring signals, and site signals.</li>
+  <li id="input-partner"><strong>Ecosystem and partner data</strong><br>
+    Catena-X, <span id="src-portale">Supplier portals</span>, data providers, logistics visibility platforms, SCRM providers, credit insurers, and relevant <span id="src-pools">industry platforms</span> as well as <span id="src-forschung">research and association sources</span>.</li>
+  <li id="input-event"><strong>Observation and event data</strong><br>
+    Media, local sources, web signals, transport events, <span id="src-wetter">weather</span>, strikes, natural disasters, <span id="src-verkehr">traffic disruptions</span> and optional aggregated <span id="src-satellit">site activity signals (satellite / port data)</span>.</li>
+</ol>
+<p>The central challenge is not collecting another signal. The challenge is linking heterogeneous data with different identities, granularities, and update cycles.</p>
+
+<h3 id="kap-4-3">4.3 Processing / AI Layer</h3>
+<p>The processing layer consists of seven core building blocks:</p>
+<ol>
+  <li id="ai-ingestion"><strong>Ingestion und Normalisierung</strong><br>
+    APIs, ETL/ELT, streaming, document ingestion, event processing, and data-quality checks.</li>
+  <li id="ai-golden"><strong>Supplier Golden Record</strong><br>
+    Harmonization of suppliers, legal entities, sites, group structures, DUNS/LEI/VAT/register numbers, and internal supplier IDs.</li>
+  <li id="ai-graph"><strong>Supply Chain Knowledge Graph</strong><br>
+    Connection of suppliers, sites, parts, assemblies, plants, programs, owners, Tier 2/Tier 3 relationships, materials, and risk events.</li>
+  <li id="ai-risk"><strong>Risk Engine</strong><br>
+    Assessment of financial, ownership, operational, quality, geo/compliance, and innovation risks.</li>
+  <li id="ai-impact"><strong>Impact Path Tracing</strong><br>
+    Traceability of how risks affect parts, assemblies, plants, programs, and vehicles.</li>
+  <li id="ai-services"><strong>AI Services</strong><br>
+    Data extraction, document analysis, news clustering, risk reasoning, forecasting, decision copilot support, and report generation.</li>
+  <li id="ai-cache"><strong>Caching und Analyse-Orchestrierung</strong><br>
+    Separation of interactive UI queries from long-running research and simulation jobs. Goal: prepared core queries in under 10 seconds; deeper research handled asynchronously.</li>
+</ol>
+
+<h3 id="kap-4-4">4.4 GUI / UI outputs</h3>
+<p>The user interface should not only display risks but prepare decisions.</p>
+<p>Core modules:</p>
+<ul>
+  <li id="gui-map"><strong>Global Risk Map:</strong> Heat map for supplier, site, and country/regional risks.</li>
+  <li id="gui-supplier"><strong>Supplier 360:</strong> Financial status, owners, sites, parts, quality, news, alerts, and actions.</li>
+  <li id="gui-impact"><strong>Impact View:</strong> Affected parts, assemblies, plants, programs, and vehicles.</li>
+  <li id="gui-graph"><strong>Graph Explorer:</strong> N-tier dependencies, ownership chains, shared locations, and single points of failure.</li>
+  <li id="gui-alert"><strong>Alert Cockpit:</strong> Prioritized early warnings, evidence, criticality, and escalation status.</li>
+  <li id="gui-action"><strong>Action Workspace:</strong> Chat, management briefings, recommended actions, tasks, documents, and escalation templates.</li>
+</ul>
+
+<h3 id="kap-4-5">4.5 Governance and security</h3>
+<p>Governance is not a side module; it is a cross-cutting capability:</p>
+<ul>
+  <li id="gov-rollen">Roles and rights</li>
+  <li>Data approvals and data contracts</li>
+  <li id="gov-audit">Audit Trail</li>
+  <li id="gov-evidenz">Source grounding and evidence linkage</li>
+  <li id="gov-hitl">Human-in-the-loop</li>
+  <li id="gov-compliance">Data protection and compliance</li>
+  <li id="gov-modell">Model evaluation and prompt/agent governance</li>
+  <li>Vendor and license management</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-5">
+<h2>5. Feasibility and Architecture Assessment</h2>
+
+<h3 id="kap-5-1">5.1 Bewertungslogik</h3>
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><strong>S</strong></td><td>Lower effort, typically standard integration or configuration</td></tr>
+    <tr><td><strong>M</strong></td><td>Medium effort, multiple interfaces or business modeling</td></tr>
+    <tr><td><strong>L</strong></td><td>High effort, OEM-specific logic and production-near integration</td></tr>
+    <tr><td><strong>XL</strong></td><td>Very high effort, enterprise-scale rollout or complex N-tier integration</td></tr>
+    <tr><td><strong>U</strong></td><td>Effort cannot be assessed credibly before exploration</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>Risk</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><strong>R1</strong></td><td>Low, known standard task</td></tr>
+    <tr><td><strong>R2</strong></td><td>Medium, mainly data quality or integration</td></tr>
+    <tr><td><strong>R3</strong></td><td>High, multiple areas, critical data, or complex modeling</td></tr>
+    <tr><td><strong>R4</strong></td><td>Critical, external dependencies, legal uncertainty, or high governance complexity</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-5-2">5.2 Architekturbausteine</h3>
+<table>
+  <thead><tr><th>Component</th><th>Purpose</th><th>Effort</th><th>Risk</th><th>Assessment</th></tr></thead>
+  <tbody>
+    <tr><td>Ingestion &amp; normalization</td><td>Connect and harmonize sources</td><td>Mâ€“L</td><td>R2</td><td>Technically established, but dependent on APIs, licenses, and data quality</td></tr>
+    <tr><td>Supplier Golden Record</td><td>Unique supplier, legal-entity, and site identity</td><td>L</td><td>R3</td><td>One of the most important and most difficult building blocks</td></tr>
+    <tr><td>Knowledge Graph</td><td>Model supply chain, parts, plants, programs, and owners as a network</td><td>Lâ€“XL</td><td>R3</td><td>Core of differentiation; the data model must be very clean</td></tr>
+    <tr><td>Risk Engine</td><td>Assess and prioritize risk indicators</td><td>Mâ€“L</td><td>R3</td><td>Start rule- and score-based; calibrate ML later</td></tr>
+    <tr><td>Impact Path Tracing</td><td>Explain risk paths down to part, assembly, plant, and program</td><td>Lâ€“XL</td><td>R3</td><td>High OEM-specific value, but strongly dependent on BOM/PLM data</td></tr>
+    <tr><td>Research Pipeline</td><td>Process news, registers, documents, and external signals</td><td>Mâ€“L</td><td>R2/R3</td><td>Quite feasible, but response time and source quality must be controlled</td></tr>
+    <tr><td>AI Services</td><td>Extraction, reasoning, forecasting, copilot, reports</td><td>Mâ€“L</td><td>R3</td><td>Build on the corporate AI platform; evidence grounding is mandatory</td></tr>
+    <tr><td>UI / UX</td><td>Risk Map, Supplier 360, Alert Cockpit, Action Workspace</td><td>Mâ€“L</td><td>R2</td><td>Develop iteratively with users; otherwise adoption remains low</td></tr>
+    <tr><td>Workflow Integration</td><td>Bring actions, tasks, and escalations into existing processes</td><td>Mâ€“L</td><td>R3</td><td>Without workflow integration it remains a dashboard</td></tr>
+    <tr><td>Operations &amp; governance</td><td>Roles, rights, monitoring, audit trail, support</td><td>L</td><td>R3</td><td>often underestimated for the pilot, decisive for scaling</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-5-3">5.3 Kritische Architekturentscheidungen</h3>
+<p>The following decisions should be made early:</p>
+<ol>
+  <li>Which corporate AI platform and which models may be used?</li>
+  <li>Which internal data platform is the target system for ingestion, storage, and access?</li>
+  <li>Is the Knowledge Graph built as a dedicated graph database, a graph layer on the existing data platform, or a hybrid?</li>
+  <li>Which internal systems provide the authoritative data for parts, plants, programs, and suppliers?</li>
+  <li>Which external data providers are used for financial data, register data, ownership, sanctions, news, and geo risks?</li>
+  <li>Is Catena-X integrated already in the MVP, or treated first as a prepared target-state building block?</li>
+  <li>Which system owns actions and workflows: the N-tier Supplier Monitor itself, SAP, ServiceNow, Jira, PLM/Q system, or an existing escalation tool?</li>
+</ol>
+</section>
+
+<hr>
+
+<section id="kap-6">
+<h2>6. Data and Integration Strategy</h2>
+
+<h3 id="kap-6-1">6.1 Guiding principle</h3>
+<p>The platform creates value not from as many data sources as possible, but from the reliable linkage of a small number of decisive sources.</p>
+<p>Priority in the MVP:</p>
+<ol>
+  <li>Identify the supplier unambiguously.</li>
+  <li>Link the supplier to the site.</li>
+  <li>Link the site to the part and assembly.</li>
+  <li>Link the part to plant, program, and vehicle architecture.</li>
+  <li>Link the risk event to the affected path.</li>
+  <li>Derive the action and accountable owner.</li>
+</ol>
+
+<h3 id="kap-6-2">6.2 Prioritized internal data sources</h3>
+<table>
+  <thead><tr><th>Source</th><th>Contribution</th><th>MVP relevance</th></tr></thead>
+  <tbody>
+    <tr id="src-vendor"><td>Supplier master data / vendor master</td><td>Starting point for all supplier analyses</td><td>very high</td></tr>
+    <tr id="src-erp"><td>SAP / ERP / purchasing</td><td>Orders, supplier relationships, call-offs, and commercial terms</td><td>very high</td></tr>
+    <tr id="src-bom"><td>EBOM / MBOM / part usage</td><td>Impact on parts, assemblies, and vehicle architecture</td><td>very high</td></tr>
+    <tr id="src-werke"><td>Plants / programs / production planning</td><td>Impact on production and SOP/EOP risks</td><td>very high</td></tr>
+    <tr id="src-quality"><td>Quality data / 8D / PPM / audits</td><td>Quality risks and supplier history</td><td>high</td></tr>
+    <tr id="src-logistik"><td>Logistics data / EDI / ASN / OTIF</td><td>Operational delivery capability</td><td>high</td></tr>
+    <tr><td>Contract and sourcing data</td><td>Single source, dual source, alternatives</td><td>high</td></tr>
+    <tr><td>Escalation history</td><td>Learning base for actions and risk assessment</td><td>medium-high</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-6-3">6.3 Prioritized external data sources</h3>
+<table>
+  <thead><tr><th>Source</th><th>Contribution</th><th>Recommendation</th></tr></thead>
+  <tbody>
+    <tr id="src-handelsregister"><td>Commercial register / company register</td><td>Legal entity, management, register data</td><td>integrate</td></tr>
+    <tr id="src-finanz"><td>Orbis / D&amp;B / Creditreform / similar providers</td><td>Financial data, ownership, credit quality</td><td>buy / connect</td></tr>
+    <tr><td>Bloomberg</td><td>Listed suppliers, market indicators, news, and supply-chain exposure</td><td>use selectively</td></tr>
+    <tr id="src-news"><td>News / Adverse Media</td><td>Early warnings, site events, insolvency signals</td><td>connect and filter with AI</td></tr>
+    <tr id="src-esg"><td>Sanctions / PEP / compliance / ESG</td><td>Legal and compliance risks</td><td>connect via established providers</td></tr>
+    <tr id="src-catena"><td>Catena-X</td><td>Traceability, quality, PCF, and partner-data exchange</td><td>integrate in the target state, test MVP dependency</td></tr>
+    <tr id="src-logistik-ext"><td>Logistics visibility</td><td>Transport and ETA risks</td><td>optional depending on the use case</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-6-4">6.4 Data-quality and ID strategy</h3>
+<p>The biggest technical risk is a beautiful graph built on wrong identities. Therefore the project needs early:</p>
+<ul>
+  <li>Matching rules for suppliers, legal entities, sites, and group structures</li>
+  <li>Confidence scores for every match</li>
+  <li>Manual review processes for critical matches</li>
+  <li>Version states for supplier, BOM, and program structures</li>
+  <li>Clear data owners per source</li>
+  <li>Auditability of all relevant data points</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-7">
+<h2>7. Make / Buy / Partner Strategy</h2>
+
+<h3 id="kap-7-1">7.1 Principle</h3>
+<blockquote>Buy data, standards, and commodity functions; own OEM-specific impact intelligence yourself.</blockquote>
+
+<h3 id="kap-7-2">7.2 Decision matrix</h3>
+<table>
+  <thead><tr><th>Capability</th><th>Recommendation</th><th>BegrÃ¼ndung</th></tr></thead>
+  <tbody>
+    <tr><td>Financial data and ratings</td><td>Buy</td><td>established market, high license and coverage complexity</td></tr>
+    <tr><td>Register and ownership data</td><td>Buy + Integrate</td><td>Data is expensive and internationally complex; OEM mapping stays internal</td></tr>
+    <tr><td>News monitoring</td><td>Buy + eigene Relevanzlogik</td><td>Providers deliver the signal; the OEM decides relevance</td></tr>
+    <tr><td>Sanktionen / Compliance Screening</td><td>Buy</td><td>rechtlich sensibel, Provider mit etablierten Prozessen nutzen</td></tr>
+    <tr><td>Catena-X-KonnektivitÃ¤t</td><td>Partner / Integrate</td><td>Standard und Ã–kosystem nutzen, nicht selbst erfinden</td></tr>
+    <tr><td>Logistics visibility</td><td>Buy / Integrate</td><td>etablierte Plattformen vorhanden</td></tr>
+    <tr><td>Supplier Golden Record</td><td>Build / Own</td><td>Strategic core capability and prerequisite for all analyses</td></tr>
+    <tr><td>BOM / part / plant / program impact</td><td>Build / Own</td><td>OEM-spezifischer Wettbewerbsvorteil</td></tr>
+    <tr><td>Knowledge Graph</td><td>Build / Own auf Plattform</td><td>Core for impact path tracing and differentiation</td></tr>
+    <tr><td>Risk Scoring</td><td>Hybrid</td><td>Basisscores einkaufen, OEM-KritikalitÃ¤t selbst modellieren</td></tr>
+    <tr><td>AI Copilot</td><td>Build on the corporate AI platform</td><td>Domain specialization and governance required</td></tr>
+    <tr><td>UI / Workflow</td><td>Build + Integrate</td><td>Own the UX for risk analysis, but integrate actions into existing systems</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-7-3">7.3 Vendor landscape in brief</h3>
+<ul>
+  <li><strong>SAP:</strong> Strong for ERP, business network, supply-chain collaboration, and operational processes; not automatically a supplier-part-plant-program impact graph.</li>
+  <li><strong>Celonis:</strong> stark fÃ¼r Process Intelligence, Process Mining und operative Verbesserungen; benÃ¶tigt fachliche ErgÃ¤nzung fÃ¼r N-Tier-Risk-Graph und Engineering-Impact.</li>
+  <li><strong>Bloomberg:</strong> stark fÃ¼r FinanzmÃ¤rkte, bÃ¶rsennotierte Unternehmen, News und Supply-Chain-Exposure; begrenzt bei privaten MittelstÃ¤ndlern und OEM-interner Teileverwendung.</li>
+  <li><strong>Catena-X:</strong> Relevant as an automotive data space and standardization approach; not the N-tier Supplier Monitor itself.</li>
+  <li><strong>SCRM-Startups/Scale-ups:</strong> Strong for external risk detection and multi-tier mapping; OEM-specific linking of parts, assemblies, plants, and programs remains integration and extension work.</li>
+  <li><strong>GroÃŸe Beratungen/Systemintegratoren:</strong> Strong for transformation, operating model, and large programs; usually not a finished dedicated OEM supplier-impact-graph product.</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-8">
+<h2>8. Project Approach and Roadmap</h2>
+
+<h3 id="kap-8-1">8.1 Delivery principles</h3>
+<ul>
+  <li>vendor-agnostisch</li>
+  <li>modular</li>
+  <li>AI-Plattform-fÃ¤hig</li>
+  <li>MVP zuerst</li>
+  <li>Human-in-the-loop</li>
+  <li>schnelle Fachbereichsvalidierung statt langer Konzeptphase</li>
+  <li>klare Trennung von interaktiven UI-Abfragen und langlaufender Recherche</li>
+</ul>
+
+<h3 id="kap-8-2">8.2 Phasenmodell</h3>
+<table>
+  <thead><tr><th>Phase</th><th>Duration</th><th>Goal</th><th>Output</th><th>Main risk</th></tr></thead>
+  <tbody>
+    <tr><td>0. Mobilization &amp; target state</td><td>4-6 weeks</td><td>Sponsor, core team, target state, scope, success criteria</td><td>Project charter</td><td>unclear scope</td></tr>
+    <tr><td>1. Exploration in the corporate environment</td><td>6-10 weeks</td><td>Understand sources, APIs, tools, initiatives, stakeholders, and pain points</td><td>Capability map &amp; gap analysis</td><td>fragmented stakeholder landscape</td></tr>
+    <tr><td>2. Product definition &amp; target architecture</td><td>6â€“8 Wochen</td><td>Define MVP scope, use cases, architecture, NFRs, 10s SLO, and governance</td><td>Product Blueprint</td><td>overloaded MVP</td></tr>
+    <tr><td>3. Data foundation</td><td>8-12 weeks</td><td>Supplier Golden Record, entity resolution, first data integrations</td><td>Data foundation</td><td>data quality and ID matching</td></tr>
+    <tr><td>4. MVP development</td><td>12-16 weeks</td><td>Knowledge Graph, Risk Engine, Impact Path Tracing, Supplier 360, Alert Cockpit</td><td>MVP Pilot</td><td>complexity of the impact logic</td></tr>
+    <tr><td>5. Pilot &amp; validation</td><td>8-12 weeks</td><td>real users, top suppliers, model calibration, value measurement</td><td>Business-case evidence</td><td>weak adoption</td></tr>
+    <tr><td>6. Skalierung &amp; Industrialisierung</td><td>3-6 months</td><td>Rollout, Tier 2/3 expansion, operations, monitoring, support</td><td>productive rollout</td><td>operating effort and governance</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-8-3">8.3 Empfohlene Reihenfolge</h3>
+<p>The sequence should not start with technology selection, but with business product definition and data exploration:</p>
+<ol>
+  <li>Define the target state and critical use cases.</li>
+  <li>Map internal data sources and existing initiatives.</li>
+  <li>MVP-Scope und Akzeptanzkriterien festlegen.</li>
+  <li>Build the data foundation and entity resolution.</li>
+  <li>Knowledge Graph and Impact Path Tracing entwickeln.</li>
+  <li>Risk Engine und AI Services anbinden.</li>
+  <li>UI und Workflows pilotieren.</li>
+  <li>Measure the business case and scale.</li>
+</ol>
+
+<h3 id="kap-8-4">8.4 Exploration Ã¼ber Workshops</h3>
+<table>
+  <thead><tr><th>Workshop</th><th>Goal</th></tr></thead>
+  <tbody>
+    <tr><td>1. Target state and use cases</td><td>Management value, critical decisions, MVP hypotheses</td></tr>
+    <tr><td>2. Internal data map</td><td>Available data sources, APIs, owners, quality, access hurdles</td></tr>
+    <tr><td>3. Supplier identity &amp; Golden Record</td><td>Supplier master data, legal entity, site, group structure, matching</td></tr>
+    <tr><td>4. Part impact and vehicle architecture</td><td>Part usage, BOM, plants, programs, variants, single source</td></tr>
+    <tr><td>5. Tier-2/3 und Supplier Collaboration</td><td>realistische Transparenz bis Tier 3, Catena-X, Supplier-Portale</td></tr>
+    <tr><td>6. Vendor and data-provider assessment</td><td>SAP, Celonis, Bloomberg, SCRM vendors, data providers, consultancies</td></tr>
+    <tr><td>7. AI- und Plattformarchitektur</td><td>Modelle, RAG, Agenten, Security, Logging, Evaluation, Governance</td></tr>
+    <tr><td>8. MVP backlog and roadmap</td><td>Prioritization, effort, acceptance criteria, team, business case</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr>
+
+<section id="kap-9">
+<h2>9. Target Operating Model</h2>
+
+<h3 id="kap-9-1">9.1 Why the operating model is part of the project</h3>
+<p>The platform only creates value when risks lead to clear decisions, escalations, and actions. Therefore the target operating model must be developed in parallel with the technology.</p>
+
+<h3 id="kap-9-2">9.2 Key roles</h3>
+<table>
+  <thead><tr><th>Role</th><th>Responsibility</th></tr></thead>
+  <tbody>
+    <tr><td>Executive Sponsor</td><td>Budget, prioritization, cross-functional escalation</td></tr>
+    <tr><td>Product Owner Supplier Risk Platform</td><td>Product vision, roadmap, business prioritization</td></tr>
+    <tr><td>Data Owner Purchasing</td><td>Supplier master data, sourcing data, contracts</td></tr>
+    <tr><td>Data Owner Quality</td><td>Quality data, audits, complaints, certificates</td></tr>
+    <tr><td>Data Owner Logistik</td><td>Abrufe, OTIF, BestÃ¤nde, Transportstatus</td></tr>
+    <tr><td>Engineering / BOM Owner</td><td>Part usage, assemblies, programs, variants</td></tr>
+    <tr><td>Graph / Data Model Owner</td><td>Data model, impact-path logic, graph quality</td></tr>
+    <tr><td>AI Product Owner</td><td>AI use cases, model quality, evaluation, human-in-the-loop</td></tr>
+    <tr><td>Compliance / Legal Owner</td><td>Data protection, sanctions, supply-chain due diligence, source approval</td></tr>
+    <tr><td>Technical Platform Owner</td><td>Operations, security, interfaces, performance</td></tr>
+    <tr><td>Supplier Risk Board</td><td>Prioritization, escalation, action approval</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-9-3">9.3 Delivery model</h3>
+<p>The project requires a mixed team of:</p>
+<ul>
+  <li>Product Lead</li>
+  <li>Managementberatung / Operating Model</li>
+  <li>Automotive Supply Chain Expertinnen und Experten</li>
+  <li>Engineering-/BOM-/PLM-Expertise</li>
+  <li>Solution Architecture</li>
+  <li>Data Architecture</li>
+  <li>Data Engineering</li>
+  <li>Graph Engineering</li>
+  <li>AI Engineering</li>
+  <li>Backend- und Frontend-Entwicklung</li>
+  <li>UX/Product Design</li>
+  <li>Security, Compliance und Plattformbetrieb</li>
+  <li>Business teams from purchasing, quality, logistics, engineering, and finance</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-10">
+<h2>10. Business Case and Success Criteria</h2>
+
+<h3 id="kap-10-1">10.1 Werthebel</h3>
+<p>Die Plattform schafft Wert Ã¼ber:</p>
+<ul>
+  <li>frÃ¼here Erkennung von Finanz- und Insolvenzrisiken</li>
+  <li>faster assessment of supplier events</li>
+  <li>Reduktion manueller Recherchen</li>
+  <li>priorisierte Alerts statt generischer Risikomeldungen</li>
+  <li>weniger ProduktionsstÃ¶rungen durch frÃ¼here Eskalation</li>
+  <li>geringere Premium-Freight- und Firefighting-Kosten</li>
+  <li>bessere Verhandlungs- und Sourcing-Entscheidungen</li>
+  <li>transparente Single-Source- und Cluster-Risiken</li>
+  <li>bessere Managementbriefings und Auditierbarkeit</li>
+  <li>faster response to quality events and regulatory risks</li>
+</ul>
+
+<h3 id="kap-10-2">10.2 MessgrÃ¶ÃŸen</h3>
+<table>
+  <thead><tr><th>KPI</th><th>Target direction</th></tr></thead>
+  <tbody>
+    <tr><td>Time-to-Impact-Assessment</td><td>time from risk event until affected parts/plants/programs are visible</td></tr>
+    <tr><td>Golden-Record-Coverage</td><td>share of in-scope suppliers with robust identity</td></tr>
+    <tr><td>Part-Impact-Coverage</td><td>share of critical parts with supplier/site/program path</td></tr>
+    <tr><td>Alert Precision</td><td>Anteil fachlich relevanter Alerts</td></tr>
+    <tr><td>Response Time P95</td><td>interactive core queries under 10 seconds</td></tr>
+    <tr><td>Case Closure Time</td><td>time until an action is decided or the risk is closed</td></tr>
+    <tr><td>Nutzeradoption</td><td>aktive Nutzer, wiederkehrende Nutzung, Fachbereichsfeedback</td></tr>
+    <tr><td>Business Impact</td><td>avoided escalations, reduced research time, avoided costs</td></tr>
+  </tbody>
+</table>
+
+<h3 id="kap-10-3">10.3 MVP-Akzeptanzkriterien</h3>
+<p>Der MVP gilt als erfolgreich, wenn:</p>
+<ul>
+  <li>300 to 500 critical suppliers are available in the system.</li>
+  <li>at least 80 percent of in-scope suppliers have a robust Supplier Golden Record.</li>
+  <li>defined suppliers are linked to legal entity, site, part, plant, and program.</li>
+  <li>mindestens ein kritischer Tier-2/Tier-3-Pfad end-to-end nachvollziehbar ist.</li>
+  <li>Supplier 360, Impact View, and Alert Cockpit are usable with real data.</li>
+  <li>interaktive Kernabfragen im Pilotscope P95 unter circa 10 Sekunden liegen.</li>
+  <li>mindestens 20 reale Risikoereignisse bewertet und mit Fachbereichen validiert wurden.</li>
+  <li>Fachbereiche bestÃ¤tigen, dass die Plattform schnellere oder bessere Entscheidungen ermÃ¶glicht.</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-11">
+<h2>11. Risks and Countermeasures</h2>
+<table>
+  <thead><tr><th>Risk</th><th>Effect</th><th>Countermeasure</th></tr></thead>
+  <tbody>
+    <tr><td>Unklarer Scope</td><td>MVP wird zu groÃŸ oder irrelevant</td><td>frÃ¼he Use-Case-Priorisierung, klare Out-of-Scope-Liste</td></tr>
+    <tr><td>Poor supplier identity</td><td>wrong assignments and wrong risks</td><td>Enforce the Supplier Golden Record as a phase before the MVP</td></tr>
+    <tr><td>Fehlender BOM-/PLM-Zugriff</td><td>kein echter Impact auf Teile und Programme</td><td>Engineering frÃ¼h einbinden, minimale Teileverwendungslogik definieren</td></tr>
+    <tr><td>Too many data sources</td><td>high complexity without value</td><td>Limit the MVP to a few decisive sources</td></tr>
+    <tr><td>AI-Halluzinationen</td><td>Vertrauensverlust und Compliance-Risiko</td><td>Evidence-first, Quellenbindung, Human-in-the-loop, Evaluation</td></tr>
+    <tr><td>10s-Anforderung falsch verstanden</td><td>unrealistische Erwartungen</td><td>interaktive Abfragen und Hintergrundrecherche trennen</td></tr>
+    <tr><td>Weak business adoption</td><td>Platform remains a technical pilot</td><td>UX-Workshops, echte FÃ¤lle, MaÃŸnahmenworkflows, Risk Board</td></tr>
+    <tr><td>Vendor lock-in</td><td>new dependency on a small vendor or large platform</td><td>modular architecture, open interfaces, exit capability</td></tr>
+    <tr><td>Rechtliche Unsicherheiten</td><td>VerzÃ¶gerung oder Verbot einzelner Signale</td><td>Legal/Compliance frÃ¼h einbinden, sensible Signale optional behandeln</td></tr>
+    <tr><td>Unclear Catena-X adoption</td><td>Tier 2/3 data is missing</td><td>Catena-X integrieren, aber MVP nicht vollstÃ¤ndig davon abhÃ¤ngig machen</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr>
+
+<section id="kap-12">
+<h2>12. Open Points for Exploration</h2>
+
+<h3 id="kap-12-1">12.1 Business und Scope</h3>
+<ul>
+  <li>Which concrete decisions should the platform improve in the first year?</li>
+  <li>Which commodity groups, programs, and plants matter most for the MVP?</li>
+  <li>Which risks currently create the greatest manual effort or the biggest damage?</li>
+  <li>Was ist der minimale, aber entscheidungsrelevante Tier-3-Scope?</li>
+  <li>Which management reports and escalation routines should be replaced or improved?</li>
+</ul>
+
+<h3 id="kap-12-2">12.2 Internal data and APIs</h3>
+<ul>
+  <li>Which systems contain supplier master data, legal entity, site, and contract data?</li>
+  <li>Which systems contain EBOM, MBOM, part usage, plants, programs, and variants?</li>
+  <li>Gibt es APIs oder nur Exporte?</li>
+  <li>How current is the data, and who owns it?</li>
+  <li>Which data may enter the AI platform, and which may not?</li>
+</ul>
+
+<h3 id="kap-12-3">12.3 Tier-2/3 und Supplier Collaboration</h3>
+<ul>
+  <li>Which Tier 2/Tier 3 data is already available?</li>
+  <li>Which suppliers are willing to share data?</li>
+  <li>Which Catena-X use cases are already active in the corporate environment?</li>
+  <li>Which data is contractually usable?</li>
+  <li>Wie werden vertrauliche Multi-Tier-Informationen geschÃ¼tzt?</li>
+</ul>
+
+<h3 id="kap-12-4">12.4 AI-Infrastruktur und Modelle</h3>
+<ul>
+  <li>Which models are approved?</li>
+  <li>Gibt es RAG-, Agenten-, Logging- und Evaluation-Standards?</li>
+  <li>Wo werden Prompts, Retrieval-Ergebnisse und Modellantworten protokolliert?</li>
+  <li>Which data may be sent to external models?</li>
+  <li>Wer ist fachlich verantwortlich fÃ¼r AI-Empfehlungen?</li>
+</ul>
+
+<h3 id="kap-12-5">12.5 Operations and governance</h3>
+<ul>
+  <li>Who owns the platform from a business perspective?</li>
+  <li>Who operates it technically?</li>
+  <li>How are data quality, matching errors, and alert quality monitored?</li>
+  <li>What role does a Supplier Risk Board play?</li>
+  <li>How are actions transferred into existing processes?</li>
+</ul>
+
+<h3 id="kap-12-6">12.6 Vendors and sourcing</h3>
+<ul>
+  <li>Which systems and vendors are already licensed in the corporate environment?</li>
+  <li>Which platforms should be connected, extended, or replaced?</li>
+  <li>Which capabilities should be owned internally?</li>
+  <li>Which capabilities should be sourced permanently?</li>
+  <li>Which exit criteria apply to external providers?</li>
+</ul>
+</section>
+
+<hr>
+
+<section id="kap-13">
+<h2>13. Recommended Next Steps</h2>
+
+<h3 id="kap-13-1">13.1 Recommended start</h3>
+<p>Der nÃ¤chste sinnvolle Schritt ist eine strukturierte Exploration mit klarer Ergebnisverpflichtung:</p>
+<blockquote>Within 6 to 10 weeks it must become clear which internal data and systems can be used, which MVP scope is realistic, which vendor building blocks should be integrated, and which capabilities must be built new.</blockquote>
+
+<h3 id="kap-13-2">13.2 Konkrete Deliverables der Exploration</h3>
+<ul>
+  <li>aligned target state</li>
+  <li>prioritized use cases</li>
+  <li>Scope und Out-of-Scope des MVP</li>
+  <li>interne Datenlandkarte inklusive API-/Zugriffsstatus</li>
+  <li>Capability Map: vorhanden, integrieren, erweitern, from scratch</li>
+  <li>Make/Buy/Partner-Entscheidungsvorlage</li>
+  <li>Zielarchitektur v1</li>
+  <li>MVP-Backlog</li>
+  <li>Akzeptanzkriterien</li>
+  <li>high-level effort estimate and team model</li>
+  <li>Business-Case-Hypothese</li>
+  <li>Risiken und Entscheidungsbedarfe</li>
+</ul>
+
+<h3 id="kap-13-3">13.3 Go/No-Go-Gates</h3>
+<table>
+  <thead><tr><th>Gate</th><th>Entscheidung</th></tr></thead>
+  <tbody>
+    <tr><td>Gate 1 nach Exploration</td><td>Ist der MVP fachlich, technisch und datenbezogen realistisch?</td></tr>
+    <tr><td>Gate 2 nach Data Foundation</td><td>Is data quality sufficient for Impact Path Tracing?</td></tr>
+    <tr><td>Gate 3 nach MVP</td><td>Liefert die Plattform bessere und schnellere Entscheidungen?</td></tr>
+    <tr><td>Gate 4 nach Pilot</td><td>Ist der Business Case stark genug fÃ¼r Skalierung?</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr>
+
+<section id="kap-anhang-a">
+<h2>Appendix A: Compact Vendor and Source Structure</h2>
+<p>This document intentionally contains only a condensed market and vendor view. The detailed research with source links, state-of-the-art assessment, and limits of individual vendors remains in the canonical long version.</p>
+
+<h3 id="kap-anhang-a-1">A.1 Vendor roles</h3>
+<table>
+  <thead><tr><th>Role</th><th>Examples</th><th>Typical contribution</th><th>Limitation</th></tr></thead>
+  <tbody>
+    <tr><td>ERP / Business Network</td><td>SAP</td><td>operational supplier and collaboration processes</td><td>not a complete OEM impact graph</td></tr>
+    <tr><td>Process Intelligence</td><td>Celonis</td><td>Prozessanalyse, Performance, EngpÃ¤sse</td><td>benÃ¶tigt fachliche Graph-/Impact-Erweiterung</td></tr>
+    <tr><td>Finanz-/Marktdaten</td><td>Bloomberg, Orbis, D&amp;B, Creditreform</td><td>Finanzdaten, BonitÃ¤t, Ownership, Markt-/News-Signale</td><td>private Tier-2/3-Coverage und interne Teilelogik begrenzt</td></tr>
+    <tr><td>SCRM / Multi-Tier Risk</td><td>Prewave, Resilinc, Exiger, Sphera, Altana</td><td>external risk detection, supply-chain mapping, monitoring</td><td>Integration into OEM BOM, plants, and programs remains necessary</td></tr>
+    <tr><td>Data space / automotive standard</td><td>Catena-X</td><td>standardized partner-data exchange</td><td>not a complete N-tier Supplier Monitor</td></tr>
+    <tr><td>Consulting / SI</td><td>Accenture, Capgemini, Deloitte, EY, PwC, KPMG</td><td>Transformation, operating model, integration, scaling</td><td>meist keine dedizierte ProduktlÃ¶sung fÃ¼r OEM-spezifischen Supplier-Impact-Graph</td></tr>
+  </tbody>
+</table>
+</section>
+
+<hr>
+
+<section id="kap-anhang-b">
+<h2>Appendix B: One-Page Logic for Architecture and Roadmap</h2>
+
+<h3 id="kap-anhang-b-1">B.1 Architekturfolie</h3>
+<p>The architecture slide should show three columns:</p>
+<ol>
+  <li><strong>Inputs / data sources</strong><br>Internal OEM data, external data, ecosystem/partner data, and event/observation data.</li>
+  <li><strong>Processing / AI layer</strong><br>Ingestion, Supplier Golden Record, Knowledge Graph, Risk Engine, Impact Path Tracing, AI Services, Caching und Governance.</li>
+  <li><strong>GUI / Outputs</strong><br>Global Risk Map, Supplier 360, Impact View, Graph Explorer, Alert Cockpit und Action Workspace.</li>
+</ol>
+<p>The core message of the slide is:</p>
+<blockquote>Heterogeneous data sources are turned into decision-ready risk intelligence through the graph, risk engine, and AI.</blockquote>
+
+<h3 id="kap-anhang-b-2">B.2 Roadmap slide</h3>
+<p>The roadmap slide should show seven phases:</p>
+<ol start="0">
+  <li>Mobilization &amp; target state</li>
+  <li>Exploration in the corporate environment</li>
+  <li>Product definition &amp; target architecture</li>
+  <li>Data Foundation</li>
+  <li>MVP Entwicklung</li>
+  <li>Pilot &amp; validation</li>
+  <li>Scaling &amp; industrialization</li>
+</ol>
+<p>The core message of the slide is:</p>
+<blockquote>First product definition and exploration, then data foundation, followed by MVP, pilot, and scaling.</blockquote>
+</section>
+
+<hr>
+
+<section class="entity-detail" id="kap-anhang-c">
+<h2>Appendix C: Architecture entities in detail</h2>
+<p class="entity-note">This appendix turns each building block from the architecture diagram into its own directly linkable chapter. The texts are deliberately kept short and management-ready, and mark open points for exploration, data access and MVP scope.</p>
+<div class="entity-index">
+<a href="#detail-inputs">C.1 Inputs / Data Sources</a>
+<a href="#detail-interne-oem-daten">C.2 Internal OEM Data</a>
+<a href="#detail-sap-erp">C.3 SAP / ERP</a>
+<a href="#detail-lieferantenstamm">C.4 Supplier Master Data</a>
+<a href="#detail-stuecklisten">C.5 BOMs / Part Usage</a>
+<a href="#detail-programme-werke">C.6 Programs / Plants</a>
+<a href="#detail-qualitaet-audits">C.7 Quality / Audits</a>
+<a href="#detail-logistik-abrufe">C.8 Logistics / Call-offs</a>
+<a href="#detail-externe-daten">C.9 External Data</a>
+<a href="#detail-handelsregister">C.10 Commercial Registers / Owners</a>
+<a href="#detail-finanzdaten">C.11 Financial Data / Ratings</a>
+<a href="#detail-news-medien">C.12 News / Media</a>
+<a href="#detail-esg-sanktionen">C.13 ESG / Sanctions</a>
+<a href="#detail-patente-hiring">C.14 Patents / Hiring</a>
+<a href="#detail-geo-event-daten">C.15 Geo / Event Data</a>
+<a href="#detail-oekosystem-partner">C.16 Ecosystem / Partners</a>
+<a href="#detail-catena-x">C.17 Catena-X</a>
+<a href="#detail-lieferantenportale">C.18 Supplier Portals</a>
+<a href="#detail-bloomberg-orbis-db">C.19 Bloomberg / Orbis / D&amp;B</a>
+<a href="#detail-tracking-transportdaten">C.20 Tracking / Transport Data</a>
+<a href="#detail-beobachtungsdaten">C.21 Observational Data</a>
+<a href="#detail-satellit-parkplatz">C.22 Satellite / Parking-Lot Signals</a>
+<a href="#detail-web-social-lokalpresse">C.23 Web / Social / Local Press</a>
+<a href="#detail-zentrale-herausforderung">C.24 Central Challenge</a>
+<a href="#detail-ai-layer">C.25 Processing / AI Layer</a>
+<a href="#detail-ingestion-normalisierung">C.26 Ingestion &amp; Normalization</a>
+<a href="#detail-entity-resolution">C.27 Entity Resolution &amp; Supplier Golden Record</a>
+<a href="#detail-knowledge-graph">C.28 Supply Chain Knowledge Graph</a>
+<a href="#detail-risk-engine">C.29 Risk Engine</a>
+<a href="#detail-impact-path-tracing">C.30 Impact Path Tracing</a>
+<a href="#detail-ai-services">C.31 AI Services</a>
+<a href="#detail-caching-orchestrierung">C.32 Caching &amp; Analysis Orchestration</a>
+<a href="#detail-governance-security">C.33 Governance &amp; Security</a>
+<a href="#detail-rechte-rollen">C.34 Rights &amp; Roles</a>
+<a href="#detail-audit-trail">C.35 Audit Trail</a>
+<a href="#detail-human-in-loop">C.36 Human-in-the-loop</a>
+<a href="#detail-datenqualitaet">C.37 Data Quality</a>
+<a href="#detail-compliance">C.38 Compliance</a>
+<a href="#detail-gui-outputs">C.39 GUI / UI Outputs</a>
+<a href="#detail-global-risk-map">C.40 Global Risk Map</a>
+<a href="#detail-supplier-360">C.41 Supplier 360</a>
+<a href="#detail-impact-view">C.42 Impact View</a>
+<a href="#detail-graph-explorer">C.43 Graph Explorer</a>
+<a href="#detail-alert-cockpit">C.44 Alert Cockpit</a>
+<a href="#detail-action-workspace">C.45 Action Workspace</a>
+<a href="#detail-ergebnis">C.46 Result: Risk Intelligence</a>
+<a href="#detail-n-tier">C.47 N-tier capable up to Tier 3 in the MVP</a>
+<a href="#detail-ai-plattform">C.48 Part of the AI Platform</a>
+<a href="#detail-modular-vendor-agnostisch">C.49 Modular &amp; vendor-agnostic</a>
+</div>
+<section id="detail-inputs">
+<h3>C.1 Inputs / Data Sources</h3>
+<p>The inputs bundle internal OEM data, external risk and company data, partner data and observable event signals. Value only emerges through mapping to supplier, site, part, plant and program.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-4-2">#kap-4-2</a></p>
+<p class="todo"><strong>To clarify:</strong> Capture concrete source systems, data owners, freshness and access path for each source.</p>
+</section>
+<section id="detail-interne-oem-daten">
+<h3>C.2 Internal OEM Data</h3>
+<p>Internal OEM data is the authoritative source for supplier relationships, purchase orders, call-offs, part usage, programs, plants and quality history.</p>
+<div class="mini-assessment">
+<p><strong>Assessment logic for the following data sources (C.3 to C.24)</strong></p>
+<ul>
+<li><strong>Role / classification:</strong> functional position in the overall picture</li>
+<li><strong>Benefit for the Supplier Monitor:</strong> added value for risk and impact analyses</li>
+<li><strong>Integration reality:</strong> API maturity, typical access, effort</li>
+<li><strong>Challenges &amp; risks:</strong> technical and organizational stumbling blocks</li>
+<li><strong>MVP classification:</strong> critical, relevant or optional in the initial scope</li>
+</ul>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-6-2">#kap-6-2</a></p>
+<p class="todo"><strong>To clarify:</strong> Complete the system map for purchasing, logistics, quality, PLM/BOM and plants.</p>
+</section>
+<section id="detail-sap-erp">
+<h3>C.3 SAP / ERP</h3>
+<p>SAP / ERP provides purchasing documents, call-offs, supplier relationships, terms and operational process data. It is connected, not replaced.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Central operational backbone for supplier relationships, purchase orders, call-offs, terms and escalation processes.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Connects external risk events with real supplier relationships, purchasing volumes, programs and plants.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> High</li>
+<li><strong>Typical access:</strong> OData, IDoc, BAPI</li>
+<li><strong>Integration effort:</strong> M</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Data is functionally correct, but often incomplete for risk analyses.</li>
+<li>Performance and authorization limits for complex queries.</li>
+<li>Strong dependency on OEM-specific customizing.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-critical - connect in a deliberately focused way, not as a full mirror.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-erp">#src-erp</a></p>
+<p class="todo"><strong>To clarify:</strong> Review relevant tables, APIs, extract intervals and authorization concept.</p>
+</section>
+<section id="detail-lieferantenstamm">
+<h3>C.4 Supplier Master Data</h3>
+<p>Supplier master data is the starting point for Supplier 360 and entity resolution. Duplicates, regional IDs, group structures and sites are critical.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Master source for supplier identities and starting point for Supplier 360, entity resolution and ownership assignment.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Foundation for supplier analyses, risk mappings and N-tier relationships.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> Medium</li>
+<li><strong>Typical access:</strong> master-data API, export</li>
+<li><strong>Integration effort:</strong> L</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Duplicates, regional IDs and historical legacy issues.</li>
+<li>Group structures and sites are often maintained unclearly.</li>
+<li>High need for functional alignment; technical effort is secondary.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-critical - prerequisite for every further expansion stage.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-vendor">#src-vendor</a></p>
+<p class="todo"><strong>To clarify:</strong> Define matching rules, manual review queue and data owners.</p>
+</section>
+<section id="detail-stuecklisten">
+<h3>C.5 BOMs / Part Usage</h3>
+<p>BOMs and part usage connect supplier risks with concrete parts, assemblies, variants and vehicle architectures.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Key to connecting supplier risks with parts, assemblies, plants, programs and vehicle architectures.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Enables true Impact Path Tracing through to SOP/EOP exposure.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> Medium</li>
+<li><strong>Typical access:</strong> PLM APIs, exports, XLS</li>
+<li><strong>Integration effort:</strong> L-XL</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Highly sensitive, &quot;sacred&quot; engineering data.</li>
+<li>Variant logic, version states and validities are complex.</li>
+<li>Often technically solvable, but functionally the most demanding part.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-critical - but only with clearly limited scope and simplified logic.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-bom">#src-bom</a></p>
+<p class="todo"><strong>To clarify:</strong> Define minimal EBOM/MBOM scope for the MVP and clarify version logic.</p>
+</section>
+<section id="detail-programme-werke">
+<h3>C.6 Programs / Plants</h3>
+<p>Programs and plants show which production lines, SOP/EOP windows and vehicle programs are affected by a supplier event.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Link between parts, production and real business impact (SOP, EOP, production volume).</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Makes risks operationally visible, including affected plants and programs.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> Low-medium</li>
+<li><strong>Typical access:</strong> exports, legacy interfaces</li>
+<li><strong>Integration effort:</strong> L</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Data is distributed across several systems.</li>
+<li>Different terminology logics by plant or region.</li>
+<li>High coordination need with production and planning areas.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant - limited plant and program scope recommended.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-werke">#src-werke</a></p>
+<p class="todo"><strong>To clarify:</strong> Select scope plants and scope programs for the pilot.</p>
+</section>
+<section id="detail-qualitaet-audits">
+<h3>C.7 Quality / Audits</h3>
+<p>Quality data, audits, complaints, PPM and 8D histories provide robust operational risk signals for Supplier 360 and the Risk Engine.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Operational risk indicators from a quality perspective (performance, history, escalations).</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Early indications of supplier instability and operational risks; strengthens assessment beyond pure financial data.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> Medium</li>
+<li><strong>Typical access:</strong> Q systems, exports</li>
+<li><strong>Integration effort:</strong> M-L</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Inconsistent KPI definitions (PPM, audits, 8D).</li>
+<li>Historical inconsistencies in existing data.</li>
+<li>Escalation logic is often implicit and undocumented.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant - integrate selectively and indicator-based.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-quality">#src-quality</a></p>
+<p class="todo"><strong>To clarify:</strong> Harmonize quality metrics and escalation history.</p>
+</section>
+<section id="detail-logistik-abrufe">
+<h3>C.8 Logistics / Call-offs</h3>
+<p>Logistics data, EDI, ASN, OTIF, call-offs and inventory information show short-term delivery capability and action needs.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Short-term operational view of delivery capability and delivery disruptions.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Detects acute risks early and supports proactive escalations.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> Medium-high</li>
+<li><strong>Typical access:</strong> EDI, event streams, ETA feeds</li>
+<li><strong>Integration effort:</strong> M</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>High data frequency and event noise.</li>
+<li>Deduplication and meaningful thresholds are essential.</li>
+<li>Keep a clear separation between operational control and risk analysis.</li>
+</ul>
+<p><strong>MVP classification:</strong> Optional in the MVP - depending on use case and organization.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-logistik">#src-logistik</a></p>
+<p class="todo"><strong>To clarify:</strong> Clarify which logistics signals are required daily in the MVP.</p>
+</section>
+<section id="detail-externe-daten">
+<h3>C.9 External Data</h3>
+<p>External data complements the internal view with legal entity, creditworthiness, ownership structures, compliance, media events and market signals.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> External registry, market, media and event data complement internal OEM data with an independent risk perspective.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Early warning, ownership/compliance transparency and external evidence for alerts and prioritization.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Technically integrable through a mix of APIs, datasets, feeds and provider platforms.</li>
+<li>In practice, entitlements, licenses and data usage rights determine the real integration path.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Heterogeneous quality, freshness and coverage by region and source.</li>
+<li>Inconsistent identifiers make matching and source-of-truth definition difficult.</li>
+<li>License and compliance limits influence storage, sharing and automation.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant, but focused on a few external core sources with high impact.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-6-3">#kap-6-3</a></p>
+<p class="todo"><strong>To clarify:</strong> Assess license situation, provider coverage and source approval.</p>
+</section>
+<section id="detail-handelsregister">
+<h3>C.10 Commercial Registers / Owners</h3>
+<p>Registry and ownership data identify legal entities, management, group affiliation and structural changes.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Primary source for legal entity, management, ownership structures and structural changes.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Clean entity resolution, ownership analyses and early indications of structural risks.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li><strong>API maturity:</strong> Low</li>
+<li><strong>Typical access:</strong> aggregators, partner providers, scraping</li>
+<li><strong>Integration effort:</strong> M-L</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>No uniform official API access.</li>
+<li>National differences in data quality and freshness.</li>
+<li>Legal and licensing dependency on intermediaries.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant - usually via partner solution, not directly.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-handelsregister">#src-handelsregister</a></p>
+<p class="todo"><strong>To clarify:</strong> Clarify country coverage, updates and ID mapping with DUNS/LEI/VAT.</p>
+</section>
+<section id="detail-finanzdaten">
+<h3>C.11 Financial Data / Ratings</h3>
+<p>Financial data, ratings, creditworthiness and insolvency signals provide early indications of stability and delivery-capability risks.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> External creditworthiness, financial KPI and rating data as financial-risk indicators.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Early warning in cases of financial distress and prioritization in the financial risk dimension.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Commercial APIs with token/key, rate limits and pagination are typical.</li>
+<li>Data is usually standardized (JSON/REST), but license terms control usage and sharing.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Coverage for private Tier-2/Tier-3 suppliers varies significantly by region.</li>
+<li>Cost and license model as well as visibility rights must be clarified.</li>
+<li>Conflicts between providers require evidence and confidence logic.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant, initially with a few core KPIs instead of a full data catalog.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-finanz">#src-finanz</a></p>
+<p class="todo"><strong>To clarify:</strong> Review provider choice between Orbis, D&amp;B, Creditreform, Bloomberg and existing licenses.</p>
+</section>
+<section id="detail-news-medien">
+<h3>C.12 News / Media</h3>
+<p>News and adverse media provide early-warning signals about insolvencies, strikes, fires, sanctions, plant closures and management events.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Event signals from often unstructured text sources (insolvency, strike, fire, plant closure, politics).</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Fast risk detection and evidence context for alerts, particularly strong in combination with graph mapping.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Free and commercial news/event sources are available.</li>
+<li>Typical pipeline approach: API query plus NLP/clustering plus deduplication.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>False positives and name ambiguity make entity resolution mandatory.</li>
+<li>License questions affect storage, sharing and quotability.</li>
+<li>Signal versus noise requires governance, feedback loops and thresholds.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant, but only with evidence-first and a feedback mechanism.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-news">#src-news</a></p>
+<p class="todo"><strong>To clarify:</strong> Define source universe, languages, false-positive handling and evidence linking.</p>
+</section>
+<section id="detail-esg-sanktionen">
+<h3>C.13 ESG / Sanctions</h3>
+<p>ESG, sanctions, PEP and compliance data are legally sensitive and should run through established providers and clear governance.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Compliance and legal risks through sanctions, restriction programs and related screening data.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Hard compliance dimension with automatic flags, escalation and auditability.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>EU and OFAC provide consolidated sanctions data as datasets/services.</li>
+<li>Third-party providers bundle lists and matching functions through screening APIs.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Legal sensitivity requires purpose limitation, access control, logging and audit.</li>
+<li>Matching is error-prone and needs human-in-the-loop.</li>
+<li>Delta and update handling must work promptly and robustly.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant, but only with clear governance and legal approval.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-esg">#src-esg</a></p>
+<p class="todo"><strong>To clarify:</strong> Document Legal/Compliance approval and data-processing purpose.</p>
+</section>
+<section id="detail-patente-hiring">
+<h3>C.14 Patents / Hiring</h3>
+<p>Patent, filing and hiring signals can indicate innovation strength, capacity build-up or strategic shifts. They are optional in the MVP.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Indirect innovation and strategy signals from patent activity and hiring patterns.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Context indicators for technology focus, capacity build-up and strategic shifts.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Patents: EPO OPS as REST service interface (typically XML/OAuth).</li>
+<li>Hiring: APIs are often restrictive or partner-bound; frequently via monitoring partners.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Signals are indirect and must be interpreted carefully.</li>
+<li>Hiring data strongly depends on access restrictions and data quality.</li>
+<li>Patent and hiring matching to legal entity is not trivial.</li>
+</ul>
+<p><strong>MVP classification:</strong> Optional in the MVP; prepared but not necessarily active.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#input-extern">#input-extern</a></p>
+<p class="todo"><strong>To clarify:</strong> Decide whether these signals are only prepared or actively integrated in the MVP.</p>
+</section>
+<section id="detail-geo-event-daten">
+<h3>C.15 Geo / Event Data</h3>
+<p>Geo and event data cover natural events, political risks, strikes, port disruptions, traffic situations and regional crises.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> External trigger and context data for weather, natural and crisis events.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Early warning for site, transport and regional risks with direct escalation relevance.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Weather data is broadly available through commercial and public APIs.</li>
+<li>Disaster and alert data can be used through international feeds/APIs.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Geo events must be mapped cleanly to supplier sites.</li>
+<li>Avoid alert fatigue: thresholds and aggregation are decisive.</li>
+<li>Quality and latency differ by event type and source.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant for top risks (e.g., flood/earthquake/storm), with deliberately limited scope.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#input-event">#input-event</a></p>
+<p class="todo"><strong>To clarify:</strong> Define event taxonomy and thresholds for alerts.</p>
+</section>
+<section id="detail-oekosystem-partner">
+<h3>C.16 Ecosystem / Partners</h3>
+<p>Partner data connects the Supplier Monitor with Catena-X, supplier portals, industry pools, data providers and logistics platforms.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Partner ecosystem as integration and collaboration layer between OEM, data providers and supplier network.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Accelerates external coverage and structured data exchange instead of many 1:1 integrations.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Technical API connection is often possible; the bottleneck is frequently contracts, entitlements and governance.</li>
+<li>Partner channels differ strongly in data model, SLA and availability.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Coverage is network-dependent and not equal in all regions.</li>
+<li>Roles, responsibilities and escalation paths must be clear across systems.</li>
+<li>Policy and license boundaries influence reuse and visibility.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant, but start with a few already established partner channels.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#input-partner">#input-partner</a></p>
+<p class="todo"><strong>To clarify:</strong> Capture existing Group initiatives and partner contracts.</p>
+</section>
+<section id="detail-catena-x">
+<h3>C.17 Catena-X</h3>
+<p>Catena-X is relevant as an automotive data space for traceability, quality, PCF and standardized partner data exchange.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Industry data space for standardized and sovereign data exchange with connector-based architecture.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Potentially better Tier-2/Tier-3 transparency and standardized collaboration instead of OEM-specific special paths.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Participation requires data-space connectivity, standards and conformance.</li>
+<li>Connector/EDC forms the technical exchange component for assets, APIs and policies.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Adoption and data depth are not guaranteed by the network.</li>
+<li>Conformance and certification efforts can be significant.</li>
+<li>Data contracts, policy constraints and identity/governance are central.</li>
+</ul>
+<p><strong>MVP classification:</strong> Target-state critical; prioritize in the MVP only if Group use cases are already productive.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-catena">#src-catena</a></p>
+<p class="todo"><strong>To clarify:</strong> Review active Catena-X use cases and available data domains in the Group.</p>
+</section>
+<section id="detail-lieferantenportale">
+<h3>C.18 Supplier Portals</h3>
+<p>Supplier portals provide self-disclosures, certificates, master-data maintenance, capacity information and escalation communication.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Formalized supplier interaction for self-disclosure, certificates, questionnaires and master-data maintenance.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Provides structured supplier-provided evidence and supports follow-up and action workflows.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Supplier-management APIs exist in established portals, usually with onboarding and OAuth processes.</li>
+<li>The bottleneck is often less API technology than governance and data contracts.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Self-reported data needs plausibility checks and cross-checking.</li>
+<li>Rights, consent and permitted data usage differ by portal.</li>
+<li>Process integration must clarify who responds, approves and escalates.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant if the portal is already an established core process.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#input-partner">#input-partner</a></p>
+<p class="todo"><strong>To clarify:</strong> Capture portal landscape, data quality and approval processes.</p>
+</section>
+<section id="detail-bloomberg-orbis-db">
+<h3>C.19 Bloomberg / Orbis / D&amp;B</h3>
+<p>Bloomberg, Orbis, D&amp;B and comparable providers deliver market, financial, ownership and creditworthiness data as external signals.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Provider cluster for commercial financial, firmographic, ownership and risk data.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Fast external data coverage and standardized integration paths.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Bloomberg integrations typically run through entitlement-based APIs.</li>
+<li>Orbis/D&amp;B offer documented REST APIs with token, limits and monitoring.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>License and entitlement control determine who sees which data.</li>
+<li>Source-of-truth conflicts between providers must be resolved actively.</li>
+<li>Cost and real Tier-2/Tier-3 coverage must be weighed against each other.</li>
+</ul>
+<p><strong>MVP classification:</strong> MVP-relevant as a buy building block; OEM-side mapping remains mandatory.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-7-3">#kap-7-3</a></p>
+<p class="todo"><strong>To clarify:</strong> Test coverage for private Tier-2/Tier-3 suppliers in target regions.</p>
+</section>
+<section id="detail-tracking-transportdaten">
+<h3>C.20 Tracking / Transport Data</h3>
+<p>Tracking and transport data show routes, ETAs, port status, carrier events and disruptions for operational logistics risks.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Operational visibility data (ETA/milestones/transport status) as logistics risk signals.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Early warning for delays and better root-cause clarification between transport and supplier problems.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Providers usually offer REST APIs with OAuth 2.0 (Client Credentials).</li>
+<li>Integration is often through standardized tracking services for ocean/air/parcel/road.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Coverage depends on carriers, regions and partner connections.</li>
+<li>High event density requires deduplication and robust prioritization.</li>
+<li>Operational real-time expectations must be clearly separated from strategic risk analysis.</li>
+</ul>
+<p><strong>MVP classification:</strong> Optional in the MVP; highly use-case-dependent.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-logistik-ext">#src-logistik-ext</a></p>
+<p class="todo"><strong>To clarify:</strong> Decide the use case: strategic risk analysis or operational transport control.</p>
+</section>
+<section id="detail-beobachtungsdaten">
+<h3>C.21 Observational Data</h3>
+<p>Observational data includes signals outside core systems: satellite, web, social, local media or site activity.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Observable additional signals outside classic enterprise systems.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Complements classic sources with independent early indicators and context signals.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Technically integrable through open data sources, APIs, feeds or monitoring partners.</li>
+<li>Value emerges only through mapping, deduplication and evidence logic.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>High noise share without clean filtering and relevance logic.</li>
+<li>Legal assessment, purpose limitation and data protection must be clarified early.</li>
+<li>Signals are often indicative and need confidence control.</li>
+</ul>
+<p><strong>MVP classification:</strong> Optional or selective; not a core dependency for the start.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#input-event">#input-event</a></p>
+<p class="todo"><strong>To clarify:</strong> Clarify legal assessment and minimal MVP scope.</p>
+</section>
+<section id="detail-satellit-parkplatz">
+<h3>C.22 Satellite / Parking-Lot Signals</h3>
+<p>Satellite and parking-lot signals can make site activity, plant utilization or disruptions visible indicatively.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Observational signals from EO/satellite data as additional situation indicators.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Independent crisis signals and validation/complement to news and reports.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>EO platforms provide APIs (including OGC-related and REST Process APIs) including batch analyses.</li>
+<li>Commercial providers supply additional APIs/SDKs for high-resolution data.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Legal and ethical assessment of observational use is required.</li>
+<li>Interpretation risk: the signal is not automatically a reliable fact.</li>
+<li>Cost and analytical-processing expertise can be high.</li>
+</ul>
+<p><strong>MVP classification:</strong> Not an MVP core; if used, clearly as an optional research building block.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#input-event">#input-event</a></p>
+<p class="todo"><strong>To clarify:</strong> Treat initially as an optional research signal, not as a core function.</p>
+</section>
+<section id="detail-web-social-lokalpresse">
+<h3>C.23 Web / Social / Local Press</h3>
+<p>Web, social and local-press signals often detect local events earlier than global newsfeeds. AI must filter out irrelevant content.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Broad and early, but highly unstructured and noisy signal landscape from web, social and local media.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Early triggers and regional indications as a complement to classic newsfeeds.</p>
+<p><strong>Integration reality:</strong></p>
+<ul>
+<li>Open news/event databases offer API and download access.</li>
+<li>Social APIs are often restricted, therefore frequently partner or monitoring-tool integration.</li>
+</ul>
+<p><strong>Challenges &amp; risks:</strong></p>
+<ul>
+<li>Very high false-positive rate without strong filtering.</li>
+<li>Entity resolution and disambiguation are mandatory.</li>
+<li>License, storage, quotability and data protection must be regulated.</li>
+</ul>
+<p><strong>MVP classification:</strong> Optional; useful only with robust filtering and feedback loops.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#src-news">#src-news</a></p>
+<p class="todo"><strong>To clarify:</strong> Define source quality, language coverage and escalation rules.</p>
+</section>
+<section id="detail-zentrale-herausforderung">
+<h3>C.24 Central Challenge</h3>
+<p>The central challenge is connecting heterogeneous data with different identities, granularities and freshness states.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> The core lies in heterogeneous data, identities and levels of freshness - not merely in adding more sources.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Differentiation emerges through Golden Record, graph and impact logic rather than through mere data volume.</p>
+<p><strong>Integration reality:</strong> Requires a combination of integration work, matching logic, governance and evidence-first approach.</p>
+<p><strong>Challenges &amp; risks:</strong> Without clean entity resolution, the result is a technically consistent but functionally wrong graph.</p>
+<p><strong>MVP classification:</strong> The MVP must enforce entity resolution and minimal impact paths; otherwise it remains a dashboard without decision impact.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-6-4">#kap-6-4</a></p>
+<p class="todo"><strong>To clarify:</strong> Define data-quality metrics and manual review processes as mandatory.</p>
+</section>
+<section id="detail-ai-layer">
+<h3>C.25 Processing / AI Layer</h3>
+<p>The AI layer normalizes data, creates unique identities, builds the Knowledge Graph, assesses risks and makes Impact Paths explainable.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Technical chain A-G remains the reference for architecture and implementation. For management, it is read as capability logic: Data Foundation - Intelligence Core - Decision Layer - Operations &amp; Trust.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Clear separation of mandatory MVP capabilities (A, B, C Tier 1-3, E, G) and pilot/target-state parts (D calibrated, F broad, C N-tier).</p>
+<p><strong>Challenges &amp; risks:</strong> The main gates are not more data, but reliable identity (B) and reliable end-to-end impact (E).</p>
+<p><strong>MVP classification:</strong> MVP-critical as an overall layer; without A, B, C (Tier 1-3), E and G, no decision-ready platform emerges.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-4-3">#kap-4-3</a></p>
+<p class="todo"><strong>To clarify:</strong> Finalize target platform, graph technology, core KPI set and AI governance.</p>
+</section>
+<section id="detail-ingestion-normalisierung">
+<h3>C.26 Ingestion &amp; Normalization</h3>
+<p>Ingestion and normalization connect APIs, exports, streaming data and documents, and secure versioned data flows with quality checks.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Data Foundation; standardized inflow for internal and external sources.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Reproducible data basis for Golden Record, graph, risk and impact.</p>
+<p><strong>Integration reality:</strong> ETL/ELT, event ingestion, schema normalization, DQ gates, reprocessing.</p>
+<p><strong>Challenges &amp; risks:</strong> Too broad a source scope in the MVP, missing idempotency, inconsistent semantics.</p>
+<p><strong>Core KPIs:</strong> ingestion success rate, freshness P95 per source, data quality score.</p>
+<p><strong>MVP classification:</strong> MVP core with focused source scope rather than full coverage.</p>
+</div>
+<p><strong>RFI addition:</strong></p>
+<ul>
+<li><code>confidence</code> is a mandatory field per record and per relationship.</li>
+<li>Mandatory metadata per record includes <code>source</code>, <code>timestamp</code> and <code>conflict_status</code>.</li>
+<li>The GUI enables confidence filters (e.g., only <code>confidence &gt; X</code>).</li>
+</ul>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-ingestion">#ai-ingestion</a></p>
+<p class="todo"><strong>To clarify:</strong> Define MVP interfaces, load frequencies and hard DQ gates per source.</p>
+</section>
+<section id="detail-entity-resolution">
+<h3>C.27 Entity Resolution &amp; Supplier Golden Record</h3>
+<p>Entity resolution merges suppliers, legal entities, sites, DUNS, LEI, VAT, commercial-registry numbers and internal IDs into one Golden Record.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Identity anchor of the entire platform; single source of identity.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Prevents wrong risk mappings and makes Supplier 360 and impact reliable.</p>
+<p><strong>Integration reality:</strong> Matching, survivorship, confidence scores and manual review queue.</p>
+<p><strong>Challenges &amp; risks:</strong> False matches for critical suppliers, unclear data ownership, missing historicization.</p>
+<p><strong>Core KPIs:</strong> Golden Record coverage, match-confidence distribution, duplicate rate before and after merge.</p>
+<p><strong>MVP classification:</strong> MVP core and gate before broader graph/AI expansion.</p>
+</div>
+<p><strong>RFI addition:</strong></p>
+<ul>
+<li><code>confidence</code> is a mandatory attribute for every match and every resulting entity/relationship assignment.</li>
+<li>Critical entities are finalized only after manual approval.</li>
+<li>The GUI enables confidence filters (e.g., only <code>confidence &gt; X</code>) for matching results.</li>
+</ul>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-golden">#ai-golden</a></p>
+<p class="todo"><strong>To clarify:</strong> Specify matching rules, confidence thresholds, review roles and master-data responsibility.</p>
+</section>
+<section id="detail-knowledge-graph">
+<h3>C.28 Supply Chain Knowledge Graph</h3>
+<p>The Knowledge Graph connects supplier, site, part, assembly, plant, program, owner, material and risk event.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Intelligence Core for dependencies and path analyses.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Makes supplier-site-part-plant-program relationships explicit and queryable.</p>
+<p><strong>Integration reality:</strong> Graph schema v1, mandatory edges, version logic as well as query and traversal APIs.</p>
+<p><strong>Challenges &amp; risks:</strong> Overloaded MVP schema, missing validity logic, uncertain Tier-2/3 coverage.</p>
+<p><strong>Core KPIs:</strong> Impact coverage of critical parts, mandatory-edge completeness, query latency P95.</p>
+<p><strong>MVP classification:</strong> MVP core for Tier 1-3; N-tier is a prepared target state.</p>
+</div>
+<p><strong>RFI addition (data model):</strong></p>
+<ul>
+<li>CRUD for nodes and edges (<code>create</code>, <code>update</code>, <code>deactivate</code>) is planned.</li>
+<li>Relationship types include at least <code>supply</code>, <code>ownership</code>, <code>financial dependency</code>, <code>process/material dependency</code>, <code>compliance</code>.</li>
+<li>Every model change is auditable (see <a href="#detail-audit-trail">C.35 Audit Trail</a>).</li>
+</ul>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-graph">#ai-graph</a></p>
+<p class="todo"><strong>To clarify:</strong> Define graph schema v1 and minimal paths for Tier 1 to Tier 3.</p>
+</section>
+<section id="detail-risk-engine">
+<h3>C.29 Risk Engine</h3>
+<p>The Risk Engine assesses financial, operational, quality, compliance, geo and innovation risks. Start rule- and score-based in the MVP.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Prioritization layer for alerts, escalation and management focus.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Condenses signals into traceable risk dimensions with evidence reference.</p>
+<p><strong>Integration reality:</strong> Rule/score model first; calibration and later ML with feedback data.</p>
+<p><strong>Challenges &amp; risks:</strong> Black-box effect without evidence, score inflation, inconsistent functional thresholds.</p>
+<p><strong>Core KPIs:</strong> alert precision, time-to-assessment, drift and calibration indicators.</p>
+<p><strong>MVP classification:</strong> Rule-based MVP; pilot for calibrated or ML-related variants.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-risk">#ai-risk</a></p>
+<p class="todo"><strong>To clarify:</strong> Define risk dimensions, weighting, thresholds and calibration process with business functions.</p>
+</section>
+<section id="detail-impact-path-tracing">
+<h3>C.30 Impact Path Tracing</h3>
+<p>Impact Path Tracing explains how a risk affects plant, vehicle and program through supplier, site, part and assembly.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> OEM differentiator between risk signal and concrete ability to act.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Makes &quot;why relevant&quot; transparent down to plant/program/vehicle including evidence.</p>
+<p><strong>Integration reality:</strong> Path search on the graph plus BOM/part usage and plant/program context.</p>
+<p><strong>Challenges &amp; risks:</strong> BOM access and version states as bottleneck, path explosion, unclear KPI definition.</p>
+<p><strong>Core KPIs:</strong> time-to-impact-assessment, path-validity rate, E2E coverage of critical part families.</p>
+<p><strong>MVP classification:</strong> MVP core for a few valid top paths; broader coverage in the pilot.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-impact">#ai-impact</a></p>
+<p class="todo"><strong>To clarify:</strong> Select the first end-to-end paths for critical part families and plants as binding scope.</p>
+</section>
+<section id="detail-ai-services">
+<h3>C.31 AI Services</h3>
+<p>AI Services support extraction, document analysis, news clustering, risk reasoning, forecasting, copilot and management reports.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Decision Layer for text-heavy analysis, briefings and copilot support.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Accelerates evidence preparation and management communication.</p>
+<p><strong>Integration reality:</strong> RAG/extraction first; copilot step by step with role permissions, logging and evaluation.</p>
+<p><strong>Challenges &amp; risks:</strong> Hallucinations without source binding, prompt-injection risks, data leakage with wrong access control.</p>
+<p><strong>Core KPIs:</strong> grounded-answer rate, user adoption, latency/cost per request.</p>
+<p><strong>MVP classification:</strong> Pilot-relevant; only a narrow evidence-first set in the MVP.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-services">#ai-services</a></p>
+<p class="todo"><strong>To clarify:</strong> Clarify approved models, RAG standards, evaluation metrics and security gates.</p>
+</section>
+<section id="detail-caching-orchestrierung">
+<h3>C.32 Caching &amp; Analysis Orchestration</h3>
+<p>Caching and orchestration separate interactive UI queries from long-running research and simulation jobs.</p>
+<div class="mini-assessment">
+<p><strong>Structured short assessment</strong></p>
+<p><strong>Role / classification:</strong> Operations &amp; Trust layer for performance, stability and operations.</p>
+<p><strong>Benefit for the Supplier Monitor:</strong> Enables P95 under 10s for core queries and robust async analyses.</p>
+<p><strong>Integration reality:</strong> Cache-aside, job orchestration, timeouts/retries, observability (logs/traces/metrics).</p>
+<p><strong>Challenges &amp; risks:</strong> Cache staleness, stampede effects, missing idempotency in background jobs.</p>
+<p><strong>Core KPIs:</strong> query latency P95, cache hit rate, job success rate, MTTR.</p>
+<p><strong>MVP classification:</strong> MVP core as an NFR prerequisite, not optional.</p>
+</div>
+<p><strong>Reference in the project outline:</strong> <a href="#ai-cache">#ai-cache</a></p>
+<p class="todo"><strong>To clarify:</strong> Define which analyses are pre-aggregated and which are executed live.</p>
+<h4>V1 maturity matrix A-G</h4>
+<table>
+<thead>
+<tr><th>Building block</th><th>Maturity level</th><th>V1 assessment</th></tr>
+</thead>
+<tbody>
+<tr><td>A Ingestion &amp; Normalization</td><td>MVP</td><td>mandatory for a reliable data basis</td></tr>
+<tr><td>B Entity Resolution &amp; Golden Record</td><td>MVP</td><td>central gate for functional correctness</td></tr>
+<tr><td>C Knowledge Graph</td><td>MVP (Tier 1-3) / Target State (N-tier)</td><td>core capability; N-tier only prepared</td></tr>
+<tr><td>D Risk Engine</td><td>MVP (rule-based) / Pilot (calibrated)</td><td>start transparently, then refine</td></tr>
+<tr><td>E Impact Path Tracing</td><td>MVP (top paths) / Pilot (broader)</td><td>OEM differentiation through end-to-end evidence</td></tr>
+<tr><td>F AI Services</td><td>Pilot / Target State</td><td>evidence-first, staged approval</td></tr>
+<tr><td>G Caching &amp; Analysis Orchestration</td><td>MVP</td><td>10s SLO and operational reliability</td></tr>
+</tbody>
+</table>
+</section>
+<section id="detail-governance-security">
+<h3>C.33 Governance &amp; Security</h3>
+<p>Governance and security cover roles, permissions, data protection, audit, source binding, human-in-the-loop and model control.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-4-5">#kap-4-5</a></p>
+<p class="todo"><strong>To clarify:</strong> Add security and compliance gates to the roadmap.</p>
+</section>
+<section id="detail-rechte-rollen">
+<h3>C.34 Rights &amp; Roles</h3>
+<p>Roles and permissions control which areas may view or edit supplier, financial, compliance, engineering and action data.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gov-rollen">#gov-rollen</a></p>
+<p class="todo"><strong>To clarify:</strong> Define role model for purchasing, quality, logistics, engineering, finance, legal and management.</p>
+</section>
+<section id="detail-audit-trail">
+<h3>C.35 Audit Trail</h3>
+<p>The audit trail documents data state, source, matching decision, AI answer, user action and approval.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gov-audit">#gov-audit</a></p>
+<p class="todo"><strong>To clarify:</strong> Define auditable actions and retention period.</p>
+</section>
+<section id="detail-human-in-loop">
+<h3>C.36 Human-in-the-loop</h3>
+<p>Human-in-the-loop prevents autonomous AI decisions in critical supplier cases. AI provides evidence; functional roles decide.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gov-hitl">#gov-hitl</a></p>
+<p class="todo"><strong>To clarify:</strong> Define approval thresholds and escalation roles per risk class.</p>
+</section>
+<section id="detail-datenqualitaet">
+<h3>C.37 Data Quality</h3>
+<p>Data quality includes completeness, freshness, matching confidence, duplicates, version states and source conflicts.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-6-4">#kap-6-4</a></p>
+<p class="todo"><strong>To clarify:</strong> Define data-quality dashboard and minimum thresholds for productive use.</p>
+</section>
+<section id="detail-compliance">
+<h3>C.38 Compliance</h3>
+<p>Compliance covers data protection, sanctions, supply-chain due diligence, source licenses, data-space rules and model use.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gov-compliance">#gov-compliance</a></p>
+<p class="todo"><strong>To clarify:</strong> Review data protection assessment, provider licenses and data-processing purposes.</p>
+</section>
+<section id="detail-gui-outputs">
+<h3>C.39 GUI / UI Outputs</h3>
+<p>The GUI should not only display risks, but prepare decisions: prioritization, evidence, impact, actions and management briefing.</p>
+<p><strong>Design reference (Figma):</strong> <a href="https://www.google.com/url?q=https://www.figma.com/make/Th6nJrdyS5XQca9KULO40a/Supplier-Monitor?fullscreen%3D1&amp;source=gmail-imap&amp;ust=1778610640000000&amp;usg=AOvVaw1exq7GeQj1yu6l0Hk02qiN" rel="noopener noreferrer" target="_blank">Supplier Monitor (Fullscreen)</a></p>
+<p><strong>RFI addition:</strong></p>
+<ul>
+<li>A Comparison View compares two suppliers, sites or paths.</li>
+<li>The delta view shows differences in risk, dependencies and affected programs/plants.</li>
+<li>The function is planned as a pilot module in the Graph Explorer and Action Workspace.</li>
+</ul>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-4-4">#kap-4-4</a></p>
+<p class="todo"><strong>To clarify:</strong> Validate user groups and the most important workflows as a click dummy.</p>
+</section>
+<section id="detail-global-risk-map">
+<h3>C.40 Global Risk Map</h3>
+<p>The Global Risk Map shows supplier, site and regional risks as a heatmap for situation awareness, escalation and drill-down.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gui-map">#gui-map</a></p>
+<p class="todo"><strong>To clarify:</strong> Define risk categories, filters and aggregation logic.</p>
+</section>
+<section id="detail-supplier-360">
+<h3>C.41 Supplier 360</h3>
+<p>Supplier 360 is the detail view for financials, owners, sites, parts, quality, news, alerts, actions and evidence.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gui-supplier">#gui-supplier</a></p>
+<p class="todo"><strong>To clarify:</strong> Specify mandatory fields and data-quality display for Supplier 360.</p>
+</section>
+<section id="detail-impact-view">
+<h3>C.42 Impact View</h3>
+<p>The Impact View shows affected parts, assemblies, plants, programs and vehicles, and makes production and program impact visible.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gui-impact">#gui-impact</a></p>
+<p class="todo"><strong>To clarify:</strong> Define minimal visualization scope for part/plant/program paths.</p>
+</section>
+<section id="detail-graph-explorer">
+<h3>C.43 Graph Explorer</h3>
+<p>The Graph Explorer makes N-tier dependencies, ownership chains, shared sites and single points of failure visible.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gui-graph">#gui-graph</a></p>
+<p class="todo"><strong>To clarify:</strong> Limit graph complexity so users stay focused.</p>
+</section>
+<section id="detail-alert-cockpit">
+<h3>C.44 Alert Cockpit</h3>
+<p>The Alert Cockpit prioritizes early warnings by criticality, evidence, impact and escalation status.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gui-alert">#gui-alert</a></p>
+<p class="todo"><strong>To clarify:</strong> Define alert thresholds, deduplication and false-positive feedback.</p>
+</section>
+<section id="detail-action-workspace">
+<h3>C.45 Action Workspace</h3>
+<p>The Action Workspace bundles chat, reports, recommended actions, tasks, documents and escalation templates.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#gui-action">#gui-action</a></p>
+<p class="todo"><strong>To clarify:</strong> Decide the leading system for tasks and escalations.</p>
+</section>
+<section id="detail-ergebnis">
+<h3>C.46 Result: Risk Intelligence</h3>
+<p>The goal is decision-ready risk intelligence instead of isolated data sources: risk, impact, evidence and action in one workflow.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#kap-2-1">#kap-2-1</a></p>
+<p class="todo"><strong>To clarify:</strong> Sharpen the result logic in the demo story and management pitch.</p>
+</section>
+<section id="detail-n-tier">
+<h3>C.47 N-tier capable up to Tier 3 in the MVP</h3>
+<p>The target model remains N-tier-capable; the MVP deliberately limits itself to Tier 1 to Tier 3 for critical commodity groups, plants and programs.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#tag-ntier">#tag-ntier</a></p>
+<p class="todo"><strong>To clarify:</strong> Select critical Tier-2/Tier-3 paths for the pilot.</p>
+</section>
+<section id="detail-ai-plattform">
+<h3>C.48 Part of the AI Platform</h3>
+<p>AI Services, RAG, model operations, logging, evaluation and security should build on the Group AI platform.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#tag-aiplatform">#tag-aiplatform</a></p>
+<p class="todo"><strong>To clarify:</strong> Align approved AI-platform components and operating model.</p>
+</section>
+<section id="detail-modular-vendor-agnostisch">
+<h3>C.49 Modular &amp; vendor-agnostic</h3>
+<p>The platform integrates data providers and tools, but keeps Golden Record, graph and impact logic controllable on the OEM side.</p>
+<p><strong>Reference in the project outline:</strong> <a href="#tag-modular">#tag-modular</a></p>
+<p class="todo"><strong>To clarify:</strong> Document interfaces, data model and exit criteria.</p>
+</section>
+</section>
+<hr>
+
+<section id="kap-schlussbild">
+<h2>Closing View</h2>
+<p>The N-tier Supplier Monitor is not another reporting solution. It is an OEM-specific risk and decision platform that connects existing data sources, vendors, and platforms and turns them into concrete impact paths, priorities, and actions.</p>
+<p>The strategic value lies in building an OEM-owned, modular, exit-capable intelligence layer across suppliers, owners, sites, parts, assemblies, plants, programs, and risk events.</p>
+</section>
+
+</article>
+
+</div>
+
+<script>
+  // Highlight target on hash navigation (works for anchor clicks AND back/forward)
+  function flashTarget() {
+    var hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    var el = document.getElementById(hash.substring(1));
+    if (!el) return;
+    // pick element to highlight: the row/section/list-item itself
+    var flashEl = el;
+    if (el.tagName === 'SPAN') {
+      flashEl = el.closest('li, td, tr, p, h2, h3, h4') || el;
+    }
+    flashEl.classList.remove('target-flash');
+    // force reflow so animation restarts
+    void flashEl.offsetWidth;
+    flashEl.classList.add('target-flash');
+  }
+  window.addEventListener('hashchange', flashTarget);
+  window.addEventListener('load', function () {
+    if (window.location.hash) flashTarget();
+  });
+  // Catch clicks on architecture items even if same hash
+  document.querySelectorAll('.arch a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      // schedule flash after the browser scrolls
+      setTimeout(flashTarget, 50);
+    });
+  });
+</script>
+
+</body>
+</html>

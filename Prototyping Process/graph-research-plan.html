@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Explorer — Research Plan · N-tier Supplier Monitor</title>
+<style>
+  :root {
+    --vw-blue: #001e50;
+    --vw-teal: #00b0f0;
+    --vw-teal-dark: #0090c8;
+    --vw-silver: #dfe4ea;
+    --vw-mid: #546e7a;
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --border: #dde3ec;
+    --done-bg: #f0faf4;
+    --done-border: #4caf76;
+    --done-text: #2e7d52;
+    --tag-blue: #e8f0fe;
+    --tag-blue-text: #1a56b0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: #1a2030;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--vw-blue);
+    color: #fff;
+    padding: 28px 32px 24px;
+    border-bottom: 3px solid var(--vw-teal);
+  }
+  .header-inner { max-width: 1100px; margin: 0 auto; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.2px; }
+  .header .sub {
+    margin-top: 5px; font-size: 13.5px; opacity: 0.72;
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .header .sub span::before { content: "·"; margin-right: 8px; opacity: 0.5; }
+  .header .sub span:first-child::before { content: ""; margin: 0; }
+
+  /* ── Progress bar ── */
+  .progress-bar-wrap {
+    background: var(--vw-blue);
+    padding: 0 32px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .progress-bar-wrap .inner { max-width: 1100px; margin: 0 auto; }
+  .progress-label {
+    font-size: 12px; color: rgba(255,255,255,0.6);
+    display: flex; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .progress-label strong { color: #fff; font-size: 13px; }
+  .bar-track {
+    background: rgba(255,255,255,0.12);
+    border-radius: 6px; height: 8px; overflow: hidden;
+  }
+  .bar-fill {
+    background: linear-gradient(90deg, var(--vw-teal), #00d4a0);
+    height: 100%; border-radius: 6px;
+    transition: width 0.4s ease;
+  }
+
+  /* ── Layout ── */
+  .main { max-width: 1100px; margin: 32px auto; padding: 0 32px 64px; }
+
+  /* ── Section header ── */
+  .section-head {
+    display: flex; align-items: center; gap: 12px;
+    margin: 36px 0 14px;
+  }
+  .section-head:first-child { margin-top: 0; }
+  .section-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--vw-blue);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .section-head h2 {
+    font-size: 15px; font-weight: 700; color: var(--vw-blue);
+    text-transform: uppercase; letter-spacing: 0.6px;
+  }
+  .section-head .section-count {
+    margin-left: auto;
+    font-size: 12px; color: var(--vw-mid);
+    background: var(--vw-silver);
+    padding: 3px 10px; border-radius: 12px;
+    font-weight: 600;
+  }
+
+  /* ── Research card ── */
+  .card {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: box-shadow 0.15s, border-color 0.2s;
+  }
+  .card:hover { box-shadow: 0 3px 12px rgba(0,30,80,0.1); }
+  .card.done {
+    background: var(--done-bg);
+    border-color: var(--done-border);
+  }
+  .card.done .card-top { opacity: 0.65; }
+
+  .card-top {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: start;
+    gap: 0;
+  }
+
+  /* Done checkbox area */
+  .card-check {
+    display: flex; align-items: center; justify-content: center;
+    padding: 18px 0 18px 16px;
+    cursor: pointer;
+  }
+  .card-check input[type="checkbox"] { display: none; }
+  .card-check .chk {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s;
+    flex-shrink: 0;
+    color: transparent;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .card.done .chk {
+    background: var(--done-border);
+    border-color: var(--done-border);
+    color: #fff;
+  }
+  .card-check:hover .chk {
+    border-color: var(--vw-teal-dark);
+    background: var(--tag-blue);
+  }
+
+  /* Card body */
+  .card-body {
+    padding: 14px 16px 14px 12px;
+  }
+  .card-title-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .card-title {
+    font-size: 14.5px; font-weight: 700; color: var(--vw-blue);
+    line-height: 1.25;
+  }
+  .card.done .card-title {
+    text-decoration: line-through;
+    color: var(--done-text);
+  }
+  .tag {
+    font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 10px;
+    letter-spacing: 0.2px;
+  }
+  .tag-ux    { background: #fce4ec; color: #c62828; }
+  .tag-tech  { background: #e3f2fd; color: #1565c0; }
+  .tag-data  { background: #f3e5f5; color: #6a1b9a; }
+  .tag-ref   { background: #fff3e0; color: #e65100; }
+  .tag-perf  { background: #e8f5e9; color: #2e7d32; }
+  .tag-vw    { background: #e8eaf6; color: #283593; }
+
+  .card-desc {
+    font-size: 13px; color: #445060; margin-bottom: 10px; line-height: 1.5;
+  }
+
+  /* Prompt block */
+  .prompt-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--vw-teal-dark);
+    cursor: pointer; user-select: none;
+    padding: 0; background: none; border: none;
+    margin-bottom: 0;
+  }
+  .prompt-toggle .arrow {
+    display: inline-block; transition: transform 0.18s;
+    font-size: 10px;
+  }
+  .prompt-toggle.open .arrow { transform: rotate(90deg); }
+
+  .prompt-block {
+    display: none;
+    margin-top: 10px;
+    background: #f7f9fc;
+    border: 1px solid #d8e2ef;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .prompt-block.open { display: block; }
+
+  .prompt-label {
+    background: var(--vw-blue);
+    color: rgba(255,255,255,0.75);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 6px 12px;
+  }
+  .prompt-text {
+    padding: 12px 14px;
+    font-size: 12.5px; line-height: 1.6;
+    color: #2a3545;
+    white-space: pre-wrap;
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+  .copy-btn {
+    display: block;
+    text-align: right;
+    padding: 6px 12px;
+    border-top: 1px solid #e2e9f2;
+  }
+  .copy-btn button {
+    font-size: 11px; font-weight: 600;
+    color: var(--vw-teal-dark);
+    background: none; border: none; cursor: pointer; padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.12s;
+  }
+  .copy-btn button:hover { background: var(--tag-blue); }
+
+  /* Done badge on right */
+  .done-badge {
+    padding: 18px 16px 18px 0;
+    display: flex; align-items: flex-start;
+  }
+  .done-stamp {
+    display: none;
+    font-size: 11px; font-weight: 700;
+    color: var(--done-text);
+    background: #c8f0d8;
+    padding: 3px 9px; border-radius: 10px;
+    letter-spacing: 0.3px;
+  }
+  .card.done .done-stamp { display: inline-block; }
+
+  /* ── Footer ── */
+  .footer-note {
+    margin-top: 40px;
+    padding: 16px 20px;
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-left: 4px solid var(--vw-teal);
+    border-radius: 8px;
+    font-size: 13px; color: var(--vw-mid);
+    line-height: 1.6;
+  }
+  .footer-note strong { color: var(--vw-blue); }
+
+  @media (max-width: 600px) {
+    .main { padding: 0 16px 48px; }
+    .header { padding: 20px 16px; }
+    .progress-bar-wrap { padding: 0 16px 16px; }
+    .card-top { grid-template-columns: 40px 1fr; }
+    .done-badge { display: none; }
+  }
+
+  /* ── Model recommendation bar ── */
+  .model-rec {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 10px; padding: 7px 10px;
+    background: #f7f9fc;
+    border: 1px solid #dde6f0;
+    border-radius: 6px;
+    font-size: 11.5px;
+    flex-wrap: wrap;
+  }
+  .model-rec-label {
+    font-weight: 700; color: #546e7a;
+    text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .model-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 10px;
+    font-size: 11.5px; font-weight: 700;
+    letter-spacing: 0.1px;
+  }
+  .model-badge.opus {
+    background: #ede9fe; color: #5b21b6;
+    border: 1px solid #c4b5fd;
+  }
+  .model-badge.sonnet {
+    background: #e0f2fe; color: #0369a1;
+    border: 1px solid #7dd3fc;
+  }
+  .model-pip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 8px;
+    font-size: 11px; font-weight: 600;
+  }
+  .model-pip.think {
+    background: #faf5ff; color: #7c3aed;
+    border: 1px solid #ddd6fe;
+  }
+  .model-pip.temp {
+    background: #fff7ed; color: #c2410c;
+    border: 1px solid #fed7aa;
+  }
+  .model-pip.long {
+    background: #f0fdf4; color: #15803d;
+    border: 1px solid #bbf7d0;
+  }
+  .card.done .model-rec { opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>Graph Explorer — Hi-Fi Prototype Research Plan</h1>
+    <div class="sub">
+      <span>N-tier Supplier Monitor · Volkswagen Presentation</span>
+      <span>Focus: Supply Chain Knowledge Graph UI</span>
+      <span>Use prompts below → save findings to this folder</span>
+    </div>
+  </div>
+</div>
+
+<div class="progress-bar-wrap">
+  <div class="inner">
+    <div class="progress-label">
+      <span>Research progress</span>
+      <strong id="progress-text">0 of 20 done</strong>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill" id="bar-fill" style="width: 0%"></div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ════════════════════════════════════════════
+     SECTION 0 — Value & Scenario Definition
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon" style="background:#7c3aed;">💡</div>
+  <h2 style="color:#7c3aed;">0 · Value &amp; Scenario Definition</h2>
+  <span class="section-count" id="count-s0">0/5</span>
+</div>
+<p style="font-size:13px;color:#546e7a;margin:-6px 0 16px;padding-left:48px;">Do this first. Defines <em>what to demonstrate</em> and <em>why it matters</em> — drives all downstream prototype and layout decisions.</p>
+
+<div class="card" data-section="s0" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">What decisions can't VW make today — and what does the graph unlock?</span>
+        <span class="tag tag-vw">VW context</span>
+      </div>
+      <p class="card-desc">The sharpest value articulation starts with a specific decision that is currently slow, wrong, or impossible. Map the before/after for the graph — not as a feature list, but as a decision quality improvement.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I am building a supply chain knowledge graph explorer for Volkswagen Group, focused on N-tier supplier risk. Before I design the prototype, I need to sharply articulate the value — specifically in terms of decisions that VW purchasing managers, supply chain directors, and risk officers make today, and how the graph changes those decisions.
+
+Help me work through this:
+
+1. List the 5 most critical supply chain risk decisions a large automotive OEM like VW needs to make in a crisis or near-crisis situation. For each decision, describe:
+   - What information is currently required to make it
+   - Where that information likely lives today (SAP, spreadsheets, email, Bloomberg, external SCRM tool, manual calls to suppliers)
+   - How long it typically takes to assemble enough information to act
+   - What goes wrong when the information is incomplete or delayed
+
+2. For each decision, explain specifically what a supply chain knowledge graph (with Tier 1–3 supplier data, parts, assemblies, plants, programs, ownership chains all connected) would change:
+   - What can now be answered in seconds that took hours or days?
+   - What questions become answerable that were previously unanswerable?
+   - What errors or blind spots are eliminated?
+
+3. Synthesize: what is the single clearest before/after statement — one sentence per decision — that captures the value for a VW executive audience?
+
+Focus on decisions, not features. I want to understand the functional value first, then work backwards to the prototype.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s0" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">The 3 demo scenarios: specific, high-stakes, graph-native</span>
+        <span class="tag tag-vw">VW context</span>
+        <span class="tag tag-ref">Reference</span>
+      </div>
+      <p class="card-desc">The prototype needs 2–3 scripted scenarios that each demonstrate a distinct graph superpower. Each scenario should be a realistic story: a named event, a question someone would actually ask, and a graph-powered answer that is impossible without the topology.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I need to define 3 demo scenarios for a supply chain graph explorer prototype being shown to Volkswagen Group executives. Each scenario must:
+- Be based on a realistic supply chain risk situation (ideally one VW has actually faced or that automotive OEMs commonly face)
+- Have a clear "inciting event" (news, alert, financial signal) that triggers the investigation
+- Demonstrate something the graph uniquely enables — not just displaying data, but revealing relationships, paths, or concentrations that flat lists or dashboards cannot
+- Have a satisfying "answer" that the graph delivers: a specific set of affected programs, a hidden concentration risk, a path to mitigation
+
+Suggest 3 scenarios structured as follows for each:
+- Scenario name (short, memorable)
+- Inciting event: what just happened or was just discovered?
+- The question the user asks: (one clear question, e.g. "Which of our plants are exposed to this risk?")
+- Why a table/dashboard fails: what specifically does a flat view miss here?
+- What the graph reveals: which relationship, path, or pattern in the topology delivers the answer?
+- The "moment of insight": describe the specific visual moment in the prototype where the executive in the room goes "oh"
+- Key data needed: what nodes and edges must be in the prototype data to make this work?
+
+Ensure the 3 scenarios each demonstrate a different graph capability:
+- Scenario A: impact blast radius (one risk, many affected endpoints)
+- Scenario B: hidden concentration / shared dependency (two "independent" suppliers that aren't)
+- Scenario C: ownership chain risk (a supplier that looks safe, but its parent is the problem)</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s0" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Graph vs. dashboard: the conceptual sell for an executive audience</span>
+        <span class="tag tag-vw">VW context</span>
+      </div>
+      <p class="card-desc">Most executives think in dashboards and KPIs. The graph is a fundamentally different mental model — topology, paths, and connectivity. Articulate why graph topology is the right representation for supply chain risk, in plain language that lands in a 5-minute pitch.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I need to articulate, clearly and compellingly, why a supply chain knowledge graph is the right representation for supplier risk — specifically for a Volkswagen Group executive audience who is used to thinking in dashboards, RAG status indicators, and supplier scorecards.
+
+Help me build the conceptual argument:
+
+1. What does a graph model represent that a tabular/dashboard model fundamentally cannot? Use the supply chain domain — not abstract graph theory. Concrete examples only.
+
+2. What is the key insight that graph topology provides over a list of risk scores? (e.g., a supplier with a score of 3/10 that is a SPOF in a critical path is more dangerous than a supplier with a score of 8/10 that has 5 alternatives — a score list cannot surface this)
+
+3. What are 2–3 analogies that make "graph thinking" intuitive for a non-technical executive? (e.g., "it's like knowing not just that there's a traffic jam, but exactly which roads into your factory are blocked and which detours exist")
+
+4. What is the elevator pitch — 3 sentences — for why VW needs a graph and not a better dashboard?
+
+5. What objections would a skeptical CPO or supply chain director raise ("we have SAP", "we already have Prewave", "this sounds complex") and what is the sharp counter for each?
+
+6. What visual moment in a live demo best converts a skeptic — what should they see that makes the graph self-evidently superior to a table?
+
+Write the answers in plain business language, not tech language. Avoid words like "nodes", "edges", "vertices". Use: suppliers, sites, parts, plants, paths, connections.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s0" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Quantify the value: time, cost, and decision speed benchmarks</span>
+        <span class="tag tag-vw">VW context</span>
+        <span class="tag tag-data">Data</span>
+      </div>
+      <p class="card-desc">What does it actually cost VW (or a comparable OEM) when supply chain risk assessment is slow? Research benchmarks: hours spent on manual impact assessment, cost of a production stoppage, premium freight costs, typical lead time for a sourcing alternative. These numbers make the ROI case concrete.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I need to build a concrete value/ROI case for a supply chain knowledge graph at a large automotive OEM like Volkswagen. Help me find and synthesize real benchmarks and reference data for the following:
+
+1. Cost of a production line stoppage at a large automotive plant:
+   - Revenue per hour / per day of production stoppage at a large VW or comparable OEM plant
+   - How many vehicles per hour a typical assembly line produces
+   - What % of stoppages are supply-chain related vs. other causes
+
+2. Cost of supply chain disruption response:
+   - How many hours does it typically take a supply chain risk team to manually assess the impact of a major supplier event (insolvency, factory fire, geopolitical disruption)?
+   - How many people are typically involved in that assessment?
+   - What is the cost of premium freight / air freight when a supply disruption forces expediting?
+
+3. Value of early warning:
+   - How much lead time is typically needed to activate an alternative supplier or build a supply bridge?
+   - What is the typical cost difference between proactive re-sourcing (weeks in advance) vs. reactive firefighting?
+
+4. Industry benchmarks:
+   - What percentage of Tier-1 disruptions originate at Tier-2 or Tier-3 level (hidden risk)?
+   - Any published stats on automotive supply chain disruption costs post-COVID (chip shortage, Ukraine war)?
+
+5. Decision speed improvement:
+   - If manual impact assessment takes 4–8 hours and the graph reduces it to 10 minutes, how does that translate to value in a real disruption scenario?
+
+Cite sources where possible. Then synthesize: write 3 punchy value statements with numbers that I could put on a slide or say in a VW presentation.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s0" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">What the Graph Explorer must answer: the 10 key questions</span>
+        <span class="tag tag-vw">VW context</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">Distill the graph's purpose into the 10 exact questions it must be able to answer — in plain language. These questions become the acceptance criteria for the prototype and the spine of the demo narrative.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">The core purpose of the supply chain graph explorer is to answer questions that require understanding the connections between suppliers, sites, parts, assemblies, plants, programs, and owners — not just the properties of individual entities.
+
+Help me define the 10 most important questions the graph must be able to answer for a VW purchasing or supply chain risk team. Structure each question as:
+
+- The question (plain language, as a supply chain manager would actually ask it)
+- Why it requires graph topology to answer (not just a lookup or filter)
+- What the graph "traversal" looks like in plain terms (e.g., "start at supplier X, follow supply relationships forward, find all parts → assemblies → plants → programs that depend on it")
+- What the answer looks like in the prototype (e.g., "3 highlighted paths, 2 plants lit up red, 1 SPOF flagged")
+
+Cover all of these question types:
+1. Blast radius: "If supplier X fails, what stops?"
+2. Dependency concentration: "Which single suppliers or sites would cause the most damage if they disappeared?"
+3. Hidden shared risk: "Which of our programs share a dependency on the same Tier-3 supplier without knowing it?"
+4. Ownership risk: "Who actually controls supplier X, and is that the same entity controlling supplier Y?"
+5. Alternative path: "If site A goes down, is there another site that can supply the same part?"
+6. Geopolitical exposure: "How much of our Golf platform supply chain passes through high-risk geographies?"
+7. Program-to-supplier: "Which suppliers touch the new EV platform — and what are their risk profiles?"
+8. Tier-3 exposure: "Where are we dependent on suppliers we have never directly contracted with?"
+9. Change impact: "If we switch from supplier A to supplier B for part X, what else in the network is affected?"
+10. Escalation path: "This alert fired — what is the exact chain from the event to our production, and who needs to act?"
+
+Then rank: which 3 of these 10 should the prototype focus on demonstrating to be maximally compelling for VW?</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     SECTION 1 — Graph Visualization Library
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon">📊</div>
+  <h2>1 · Graph Visualization Library</h2>
+  <span class="section-count" id="count-s1">0/3</span>
+</div>
+
+<div class="card" data-section="s1" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Best JS graph library for supply-chain network prototype</span>
+        <span class="tag tag-tech">Tech</span>
+      </div>
+      <p class="card-desc">Compare Cytoscape.js, D3-force, React Flow, vis.js, and Sigma.js for rendering 100–5000 nodes with edges. Need: performance, styling control, expand/collapse, edge labels, and ideally React-compatible.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I am building a high-fidelity HTML/JS prototype of a Supply Chain Knowledge Graph Explorer for an automotive OEM (Volkswagen context). The graph shows supplier nodes, site nodes, part nodes, and assembly/plant/program nodes connected across Tier 1–3. Node count in the prototype: ~50–200 visible at once, up to 5 000 in the full product.
+
+Compare these JS graph libraries for this use case: Cytoscape.js, D3-force layout, React Flow, vis.js (Network), Sigma.js + Graphology, and elkjs for layout.
+
+For each, assess:
+1. Performance at 200+ visible nodes with live filtering
+2. Built-in or easy expand/collapse of node neighborhoods
+3. Custom node shapes (circles, icons, color-coded rings for risk level)
+4. Edge styling (dashed = weak link, thick = critical path, animated = alert)
+5. React compatibility or standalone HTML embed
+6. Ease of implementing a "focus on node, fade background" interaction
+
+Give a recommendation with reasoning, then provide a minimal working HTML snippet for the recommended library showing: 3 supplier nodes → 1 part node → 1 plant node, with color-coded risk levels and a click-to-expand interaction.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s1" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Graph layout algorithms for supply-chain hierarchies</span>
+        <span class="tag tag-tech">Tech</span>
+      </div>
+      <p class="card-desc">Which layout algorithm works best for n-tier supply chains? Hierarchical (top-down OEM → Tier1 → Tier2), force-directed (cluster by risk), geographic (map-pinned). Research tradeoffs for the prototype.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">For a supply chain knowledge graph prototype (Volkswagen N-tier Supplier Monitor), I need to choose a layout algorithm. The graph has these node types: OEM plant, Vehicle Program, Assembly, Part, Supplier (Tier 1), Supplier Site (Tier 1), Supplier (Tier 2), Supplier (Tier 2 site), Supplier (Tier 3). Edges represent: supplies, manufactured-at, used-in, owned-by, at-risk.
+
+Explain these layout options for this context:
+1. Hierarchical / dagre (top-down OEM → Tier 1 → Tier 2 → Tier 3)
+2. Force-directed (nodes cluster by relationship strength, risk proximity)
+3. Concentric (OEM center, tiers in rings)
+4. Geographic (nodes positioned on a world map by site location)
+5. Hybrid: hierarchy for default, switch to force-directed for "risk spread" mode
+
+For each: describe what a user would see, what insights it reveals, and what its blind spots are. Which would you recommend as the *default* layout for a supply chain risk investigation tool, and which as secondary views? Include any Cytoscape.js or vis.js layout config snippets for the top pick.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s1" data-model="sonnet-precise">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Rendering performance at scale: virtual graph + level-of-detail</span>
+        <span class="tag tag-tech">Tech</span>
+        <span class="tag tag-perf">Performance</span>
+      </div>
+      <p class="card-desc">The full graph will have thousands of nodes. Prototype needs to demo smoothly. Research WebGL canvas rendering (Sigma.js, PixiJS), virtualization strategies, and LOD techniques for graph UIs.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I am building a graph explorer prototype for a supply chain product that will eventually show 5,000+ nodes. For a hi-fi demo prototype I need it to feel fast and smooth. Research and explain:
+
+1. WebGL-based graph rendering options (Sigma.js with WebGL renderer, PixiJS custom graph, ogma by Linkurious) vs SVG/Canvas — when does WebGL become necessary?
+2. Level-of-detail (LOD) strategies: at low zoom show supplier clusters/aggregates, at medium zoom show individual suppliers, at high zoom show sites and parts
+3. "Visible window" virtualization: only render nodes in viewport, unload distant ones
+4. Aggregation nodes: show "47 Tier-2 suppliers" as one collapsed node until expanded
+5. Progressive loading: load Tier-1 immediately, Tier-2 on demand, Tier-3 only on explicit drill-down
+
+For the prototype (not production), give me a practical approach to fake good performance with ~200 real nodes but make it *look* like it could scale, using Cytoscape.js or vis.js. Include concrete config or code approach.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     SECTION 2 — Graph UX Patterns & Interactions
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon">🖱️</div>
+  <h2>2 · Graph UX Patterns &amp; Interactions</h2>
+  <span class="section-count" id="count-s2">0/4</span>
+</div>
+
+<div class="card" data-section="s2" data-model="sonnet-creative">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Core interaction patterns for enterprise graph explorers</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">Research how tools like Neo4j Bloom, Linkurious, Maltego, and Palantir Gotham handle graph interaction. Focus on expand/collapse, path highlight, lasso select, and side-panel details.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I'm designing the UX for an enterprise supply chain graph explorer (N-tier Supplier Monitor, Volkswagen context). Describe in detail the interaction design patterns used by mature graph exploration tools — specifically Neo4j Bloom, Linkurious Enterprise, Maltego, and Palantir Gotham.
+
+For each, describe:
+1. How does node expansion work? (click, right-click menu, double-click, expand button on hover?)
+2. How is a selected node's neighborhood highlighted vs dimmed?
+3. How does the side panel / detail panel work when a node or edge is selected?
+4. How do users filter/search to locate a node in a large graph?
+5. How are paths between two nodes visualized (shortest path, all paths)?
+6. How do they handle "pinning" nodes to fix their position while re-running layout?
+
+Then synthesize a recommended interaction model for the supply chain graph prototype. Include which interactions are most critical for showing "risk flows through the supply chain" to a VW executive audience.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s2" data-model="sonnet-creative">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Risk visualization on graph nodes and edges</span>
+        <span class="tag tag-ux">UX</span>
+        <span class="tag tag-data">Data</span>
+      </div>
+      <p class="card-desc">How to visually encode risk level (critical/high/medium/low), risk type (financial, geo, quality, compliance), and risk propagation direction on nodes and edges. Color, size, animation, badges.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I need to design the visual encoding of risk information on nodes and edges in a supply chain graph explorer prototype. The graph nodes represent: Supplier (Tier 1/2/3), Supplier Site, Part, Assembly, Plant, Vehicle Program. Each can have risk attributes:
+- Risk level: Critical / High / Medium / Low / None
+- Risk type: Financial, Geopolitical, Quality, Compliance, Operational
+- Alert status: Active alert / Monitoring / Clear
+- Single Point of Failure: yes/no
+
+Edges represent: supplies, manufactured-at, used-in, owned-by.
+
+Design a complete visual encoding system:
+1. Color palette for risk levels (accessible, works on dark and light backgrounds, not just red/green)
+2. Node visual design: what changes for a "critical financial risk" supplier vs a "low risk" one? (ring, glow, badge, icon, size?)
+3. Edge visual design: how to show "this supply path is at risk" vs "this path is healthy"? (color, thickness, dashes, animation?)
+4. Risk type icons/badges: small indicators on node without cluttering
+5. "Risk propagation" visualization: animated pulse along a path when a risk event is traced from supplier to plant
+6. Single point of failure highlight: what visual treatment makes SPOF nodes stand out dramatically?
+
+Give concrete CSS/SVG/Canvas approaches and describe how this would look in the prototype.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s2" data-model="sonnet-creative">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Impact path tracing: "show me the blast radius" interaction</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">The killer feature: when a supplier has a risk event, trace which parts → assemblies → plants → programs are affected. Design the UX for this "impact trace" interaction in the graph.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">In the N-tier Supplier Monitor graph explorer prototype, the most important feature is "Impact Path Tracing" — when a user selects a supplier with an active risk (e.g., financial insolvency risk on a Tier-2 chip supplier in Malaysia), the system should visually show exactly which supply chain paths are affected all the way to the OEM's plants and vehicle programs.
+
+Design the complete UX interaction flow for this feature:
+
+1. Entry point: user selects a risky supplier node — what happens immediately? (auto-expand? panel opens? or must user trigger "trace impact"?)
+2. Path visualization: how are the affected nodes and edges highlighted? How are unaffected nodes handled (dimmed, hidden, greyed)?
+3. Animation: should the risk "travel" visually from supplier → site → part → assembly → plant → program? Describe the animation approach.
+4. Multiple paths: if the supplier provides 12 different parts going to 3 plants, how to show this without overwhelming?
+5. The impact summary panel: what info appears alongside the graph? (e.g., "3 plants affected, 7 part numbers, €42M revenue at risk, SOP 2025-Q3")
+6. Filtering: can the user filter to show only the most critical path? Only specific plants?
+7. "Back" / reset: how does user return to the full graph view?
+
+Describe the ideal prototype implementation with Cytoscape.js or similar, including relevant API calls or CSS classes.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s2" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Graph search, filtering, and "find my supplier" UX</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">Large graphs need a way to locate a specific node fast. Research search-as-you-type, faceted filter panels (by tier, risk level, country, commodity), and "lens" / spotlight behaviors.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Design the search and filtering UX for a supply chain graph explorer with 500–5000 nodes. Users are supply chain managers, purchasing managers, and quality engineers at Volkswagen. They need to:
+- Find a specific supplier by name or ID quickly
+- Filter the graph to show only: Tier-2 suppliers in a specific country, or all parts used in a specific vehicle program, or all nodes with "critical" risk level
+- Toggle visibility layers: e.g., "show ownership chains", "show only financial risk paths", "show Tier-3 only"
+
+Design the filter/search UI:
+1. Search bar behavior: type "Bosch" → graph animates to highlight/focus all Bosch entities, non-matching nodes fade. Describe the animation.
+2. Filter panel design: what filters are most useful? (tier level, country, risk type, risk level, commodity group, connected to plant X). Side panel or toolbar?
+3. "Active filters" state: how does the user see what's currently filtered? How do they clear filters?
+4. Breadcrumb / navigation history: if user drills into a subgraph, how do they navigate back?
+5. Saved views: can users save a filtered graph view for a specific risk scenario?
+
+Provide a wireframe-level description and any relevant HTML/CSS snippets for the filter panel design. Consider the Volkswagen brand (dark blue, professional, data-dense but clean).</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     SECTION 3 — Data Model & Node Types
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon">🗃️</div>
+  <h2>3 · Graph Data Model &amp; Node Types</h2>
+  <span class="section-count" id="count-s3">0/3</span>
+</div>
+
+<div class="card" data-section="s3" data-model="sonnet-precise">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Prototype graph data schema: nodes, edges, properties</span>
+        <span class="tag tag-data">Data</span>
+      </div>
+      <p class="card-desc">Define the JSON data structure for the prototype graph. What node types, edge types, and properties are needed to demonstrate all key features: risk tracing, tier levels, ownership, parts-to-plants.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I need to define the graph data model for a supply chain knowledge graph prototype (Volkswagen N-tier Supplier Monitor). Generate a complete JSON data structure I can use directly in Cytoscape.js (or vis.js) for a prototype with realistic fake data.
+
+Include these node types with appropriate properties:
+- OEM (Volkswagen): name, type="oem"
+- Vehicle Program: name (e.g. "Golf Platform MQB"), type="program", risk_level
+- Plant: name, country, city, type="plant", risk_level, program_ids
+- Assembly: name, type="assembly", part_count, program_ids
+- Part: name, part_number, type="part", commodity_group, risk_level, single_point_of_failure (bool)
+- Supplier Tier-1: name, country, type="supplier", tier=1, risk_level, risk_type, financial_score, alert_status
+- Supplier Site Tier-1: name, country, city, type="site", tier=1, risk_level
+- Supplier Tier-2: name, country, type="supplier", tier=2, risk_level, risk_type
+- Supplier Tier-3: name, country, type="supplier", tier=3, risk_level
+
+Include edge types: SUPPLIES, MANUFACTURED_AT, USED_IN, OWNED_BY, PART_OF_ASSEMBLY, ASSEMBLED_AT
+
+Build a realistic scenario: a Malaysian semiconductor supplier (Tier-2) with CRITICAL financial risk that supplies a chip (Tier-1 electronic supplier) that is a SPOF for an infotainment part used in the Golf and Tiguan programs at 2 plants. Show the full chain.
+
+Output valid Cytoscape.js elements JSON (nodes + edges arrays). Include ~25–35 nodes total with 3 tiers visible.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s3" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Ownership chain visualization: who owns whom</span>
+        <span class="tag tag-data">Data</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">Ownership structures (private equity, holding companies, shared Chinese group ownership) are a key risk signal. How to layer ownership chain on top of the supply chain graph without visual overload.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">In a supply chain graph explorer, ownership structure is a critical risk signal: if two suppliers are owned by the same Chinese holding company, that's a concentration risk. If a supplier is owned by a private equity fund with high debt, that's a financial risk.
+
+Design the UX and data approach for overlaying ownership chains on a supply chain graph:
+
+1. Data model: how to represent legal entity → site → ultimate parent → intermediate holding, alongside the supply chain edges (supplier → part → plant)?
+2. Visual toggle: "show ownership layer" button — what changes in the graph when toggled on? New node types appear? Existing nodes get ownership badges?
+3. Concentration risk highlight: if 3 suppliers share the same parent group, visually group them (shared background color, group outline, "Concentration Risk" badge)
+4. Ownership chain sidebar: when a supplier node is selected, show the ownership chain as a small tree in the side panel (not cluttering the main graph)
+5. PE / high-debt ownership: what visual cue signals "this supplier is PE-owned with concerning debt levels"?
+6. Geographic ownership risk: supplier in Germany but owned by entity in sanctioned country — how to surface this?
+
+Provide a concrete design solution with CSS/SVG mockup description, and describe the Cytoscape.js approach to rendering two parallel edge types (supply vs ownership) without visual chaos.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s3" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Single point of failure detection: visual design patterns</span>
+        <span class="tag tag-ux">UX</span>
+        <span class="tag tag-data">Data</span>
+      </div>
+      <p class="card-desc">SPOF suppliers and parts need to visually "pop" as high-priority concerns. Research how to visually signal SPOF status in the graph and what data is needed to calculate it.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Single Points of Failure (SPOF) are one of the most critical insights in a supply chain graph — a supplier or part where there is no alternative source and a disruption would halt production. Design the UX treatment for SPOF in the graph explorer prototype.
+
+1. SPOF definition in the graph: what graph property/algorithm identifies a SPOF? (e.g., a node where removing it disconnects the path from a Tier-2 material to an OEM plant, and "single_source" flag is true). Describe the graph-theoretic definition.
+
+2. Visual treatment options for SPOF nodes — design and compare:
+   a. Warning ring / pulsing outline
+   b. Warning badge / icon overlay
+   c. Node color completely overridden to warning color
+   d. Larger node size than non-SPOF peers
+
+3. SPOF edge treatment: if a part has only one supplier, the edge from that supplier should visually signal "this is the only path" — how?
+
+4. SPOF in context of risk levels: is a SPOF with LOW risk more or less alarming than a dual-sourced supplier with CRITICAL risk? Design a combined visual encoding.
+
+5. SPOF summary panel: "You have 12 SPOFs in scope. 4 are currently at risk." — design this as an overlay or sidebar element on the graph canvas.
+
+6. "What if" simulation: user clicks a SPOF node and selects "simulate disruption" — what happens to the graph visually? Which nodes turn red? Describe the animation.
+
+Provide SVG/CSS mockup description and Cytoscape.js selector/style code.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     SECTION 4 — Competitive & Reference UIs
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon">🔍</div>
+  <h2>4 · Competitive &amp; Reference UIs</h2>
+  <span class="section-count" id="count-s4">0/3</span>
+</div>
+
+<div class="card" data-section="s4" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">SCRM vendor graph UIs: Prewave, Resilinc, Exiger, Sphera</span>
+        <span class="tag tag-ref">Reference</span>
+        <span class="tag tag-vw">VW context</span>
+      </div>
+      <p class="card-desc">Research how existing Supply Chain Risk Management tools visualize their network graphs. What do they do well? What is missing (specifically the OEM impact tracing angle)?</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I'm building a supply chain graph explorer prototype for Volkswagen and need to understand the current competitive landscape. Research and describe the graph/network visualization UIs of these SCRM tools: Prewave, Resilinc, Exiger (DDIQ / Worldcheck), Sphera, Riskmethods (now SAP), and any other notable supply chain risk visualization tools.
+
+For each tool, describe:
+1. What does the network/graph visualization look like? (screenshot descriptions if you know them, or feature descriptions)
+2. What node types are shown and how are they distinguished?
+3. How is risk severity encoded visually?
+4. Can users trace impact from a Tier-2 supplier to a specific part/assembly/plant/vehicle program?
+5. What are the notable strengths in graph UX?
+6. What is notably missing, especially around OEM-specific part → program impact tracing?
+
+Then synthesize:
+- What is the state of the art in supply chain graph UX today?
+- What visual and interaction patterns should I "steal" (best practices)?
+- What is the clear gap that the N-tier Supplier Monitor should fill visually and functionally?
+- How should the prototype look *demonstrably different and better* for a VW audience who has seen these tools?</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s4" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Neo4j Bloom &amp; Linkurious: graph exploration UX deep-dive</span>
+        <span class="tag tag-ref">Reference</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">These tools are purpose-built graph explorers used in enterprise contexts. Deep-dive their UX for inspiration: search, expand, style rules, saved perspectives, and path finding.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Do a deep-dive UX analysis of Neo4j Bloom and Linkurious Enterprise — two of the most mature enterprise graph exploration tools. I want to use these as inspiration for a supply chain graph explorer prototype for Volkswagen.
+
+For Neo4j Bloom:
+1. How does "Search Phrases" work? (natural language → graph query)
+2. How do style rules work? (conditional visual encoding based on node properties)
+3. How does "Expand" work with relationship type filtering?
+4. How does path finding UI work?
+5. What is the "Perspective" concept and how could it map to supply chain use cases?
+
+For Linkurious Enterprise:
+1. How does its alert / detection feature work in the graph context?
+2. How does case management integrate with the graph?
+3. How does it handle very large graphs (100k+ nodes)?
+4. What is the "design mode" vs "exploration mode" separation?
+5. What does their timeline/temporal view look like?
+
+Then give me 5 specific UX patterns I should directly implement in the supply chain prototype, translated to the supply chain domain. For example: "Neo4j Bloom's style rules → use to color-code nodes by risk_level property dynamically".</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s4" data-model="opus-think">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Volkswagen / automotive industry: existing internal tools &amp; expectations</span>
+        <span class="tag tag-vw">VW context</span>
+        <span class="tag tag-ref">Reference</span>
+      </div>
+      <p class="card-desc">What tools does VW/the automotive industry currently use for supplier visibility? What are the visual and UX expectations of a VW executive audience? Brand and design language considerations.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">I am presenting a supply chain knowledge graph explorer prototype to Volkswagen Group stakeholders (supply chain directors, purchasing VPs, possibly a CDO or CTO). Help me understand their context and expectations.
+
+1. What supply chain risk and visibility tools does Volkswagen Group currently use or has publicly discussed? (SAP, Celonis, Catena-X, any custom tools, Bloomberg)
+2. What is Volkswagen Group's current approach to Catena-X and supply chain data sharing?
+3. What visual and UX style do VW's internal digital tools follow? (any public info on VW's design system, color palette, enterprise software aesthetic)
+4. What are the current pain points in automotive supply chain visibility that VW executives have publicly discussed? (post-COVID chip shortage, geopolitical risks, ESG/supply chain due diligence act in Germany)
+5. What would make a graph explorer prototype feel "enterprise-grade" and trustworthy to a German automotive executive vs feeling like a startup demo?
+
+Then help me calibrate the prototype's visual design: should it use VW's brand colors (dark blue #001e50, silver), or a more neutral dark-mode enterprise aesthetic? What typography and density level would feel appropriate vs juvenile?
+
+Finally: what 3 specific scenarios/use cases should the prototype demo to have the maximum impact for a VW audience?</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     SECTION 5 — Node Detail Panel & Side UI
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon">📋</div>
+  <h2>5 · Node Detail Panel &amp; Side UI</h2>
+  <span class="section-count" id="count-s5">0/3</span>
+</div>
+
+<div class="card" data-section="s5" data-model="sonnet-creative">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Supplier 360 mini-panel: what to show when a supplier node is selected</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">When a user clicks a supplier node in the graph, a side panel shows a mini Supplier 360. Design what information hierarchy, data density, and actions belong in this contextual panel.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">In the graph explorer, when a user clicks a supplier node, a side panel slides in showing contextual details. Design the information architecture and visual layout of this "Supplier 360 mini-panel" for the prototype.
+
+The panel must work for Tier-1 and Tier-2/3 suppliers (with less data available for lower tiers).
+
+Design the panel content hierarchy:
+1. Header: supplier name, country flag, tier badge (T1/T2/T3), overall risk indicator
+2. Risk summary section: top 2-3 active risk signals with severity (e.g., "💰 Financial: Credit score deteriorating — 23 days ago", "🌍 Geo: Manufacturing site in flood zone — active alert")
+3. Graph context section: "In this graph: supplies 3 parts → 2 assemblies → affects 1 plant" with mini stats
+4. Key data points: financial score, employee count, primary site country, commodity group
+5. Recent news: 2-3 most recent relevant news headlines with date
+6. Actions: buttons for "Trace impact", "View full Supplier 360", "Flag for review", "Export"
+
+Design considerations:
+- The panel should not cover more than 30% of the graph canvas
+- Should feel like it belongs to the same design system as the graph
+- Data density: dense enough to be useful, not so dense it overwhelms
+- What happens when data is unavailable for a Tier-3 supplier?
+
+Provide an HTML/CSS layout for this panel (single-file, no dependencies).</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s5" data-model="sonnet-balanced">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Toolbar & graph controls: zoom, filter, layout toggle, legend</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">The graph canvas needs a toolbar with zoom controls, layout switch, filter toggles, legend, and a minimap. Design what controls are essential and how to lay them out without cluttering the graph.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Design the toolbar and control UI for a supply chain graph explorer canvas. The graph canvas takes up the full screen with the side panel on the right. I need floating/overlay controls that don't obscure the graph.
+
+Design and describe placement + content of:
+
+1. Top toolbar (above canvas or floating top-left):
+   - Graph title / breadcrumb ("Supplier Network > Golf MQB Program > Impact View")
+   - Search box with typeahead
+   - Layout switcher: Hierarchy | Force | Geographic
+   - "Show layer" toggles: Supply Chain | Ownership | Risk Paths only
+   - Export / share button
+
+2. Bottom-left graph controls (like a map):
+   - Zoom in / zoom out / fit-to-screen
+   - Minimap (thumbnail of full graph showing viewport position)
+
+3. Top-right legend / key:
+   - Node type legend (color/shape per node type)
+   - Risk level color legend
+   - Toggle to show/hide legend
+
+4. Contextual floating actions (appear when node is selected, near the selected node):
+   - "Expand neighbors"
+   - "Trace impact path"
+   - "Hide this node"
+   - "Pin here"
+
+For each control group, provide the HTML/CSS implementation or detailed description. Use the VW color palette (dark blue #001e50, teal accent #00b0f0, white/light grey UI surfaces). The overall feel should be like a premium enterprise analytics tool, not a generic dashboard widget.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s5" data-model="sonnet-creative">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Alert cockpit integration: surfacing live alerts in the graph context</span>
+        <span class="tag tag-ux">UX</span>
+        <span class="tag tag-data">Data</span>
+      </div>
+      <p class="card-desc">How to surface alert notifications within the graph canvas — so new risk events draw the user's attention to the affected node. Alert badges, notification drawers, and alert-driven graph navigation.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">In the supply chain graph explorer prototype, there is an "Alert Cockpit" feature — a list of active risk alerts (e.g., "Tier-2 chip supplier Nexchip (Malaysia) — insolvency filing detected — HIGH"). Design how alerts are integrated into the graph canvas experience.
+
+1. Alert entry point: there is an alert panel/drawer that can be opened from the toolbar. When the user opens it, they see a prioritized list of alerts. How does clicking an alert navigate the graph? (fly-to node? highlight path? open side panel?)
+
+2. Live alert indicators on canvas: when a new alert fires, a node on the graph should show a visual "new alert" state — without the user having to look at the alert list. Design this: pulsing ring? floating badge? notification dot?
+
+3. Alert severity levels in graph: CRITICAL (red pulsing), HIGH (orange), MEDIUM (yellow), INFORMATIONAL (blue) — describe the visual treatment for each on the node in the graph.
+
+4. Alert acknowledgement from graph: user can right-click a node → "Acknowledge this alert" → the visual indicator changes to "acknowledged but unresolved". Design this state change.
+
+5. Alert history on node: when a node's side panel is open, there is an alert history section: "3 alerts in last 90 days". Design this mini-timeline.
+
+6. "Broadcast alert" scenario for demo: show what the graph looks like at the moment a new CRITICAL alert fires — animate the sequence from "all clear" to "alert state" so the demo feels live and impactful.
+
+Provide the CSS animation code for the pulsing critical alert node indicator and describe the overall UX flow.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     SECTION 6 — Prototype Build
+════════════════════════════════════════════ -->
+<div class="section-head">
+  <div class="section-icon">🛠️</div>
+  <h2>6 · Prototype Build</h2>
+  <span class="section-count" id="count-s6">0/4</span>
+</div>
+
+<div class="card" data-section="s6" data-model="sonnet-code">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Prototype skeleton: full-screen graph canvas layout in HTML</span>
+        <span class="tag tag-tech">Tech</span>
+      </div>
+      <p class="card-desc">Build the shell HTML layout: full-screen canvas, top toolbar, right side panel (collapsible), bottom controls, alert drawer. No graph logic yet — just the layout structure and CSS.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Build the HTML/CSS skeleton for a full-screen supply chain graph explorer prototype. Single HTML file, no frameworks needed (vanilla HTML/CSS/JS). VW brand colors: dark blue #001e50, teal accent #00b0f0, light grey surfaces #f4f6f9.
+
+Layout requirements:
+- Full viewport (100vh × 100vw) with no scroll
+- Top bar (48px): logo area left, breadcrumb center, action buttons right. Background: #001e50.
+- Graph canvas: fills remaining viewport after top bar. Background: #0d1929 (dark, like a premium analytics tool). This is where Cytoscape.js will be mounted.
+- Right side panel (320px wide, full height minus top bar): slides in/out. When closed, graph canvas takes full width. Dark panel: #111c30 background, white text.
+- Bottom-left floating controls: zoom in/out/fit buttons, stacked vertically, semi-transparent dark background.
+- Top-right floating legend: collapsible, shows node type colors.
+- Alert drawer: slides up from bottom (or in from left), initially hidden, triggered by a bell icon in top bar.
+- Filter toolbar: horizontal strip below top bar, initially collapsed, expands to show filter chips.
+
+Use CSS variables for all colors. Make the layout feel like a premium enterprise analytics tool (think Palantir or Datadog level of polish). Do NOT add any actual graph functionality — just the shell. Include placeholder text/icons to show where things go.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s6" data-model="sonnet-code">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Cytoscape.js graph implementation with supply chain data</span>
+        <span class="tag tag-tech">Tech</span>
+      </div>
+      <p class="card-desc">Implement the actual Cytoscape.js graph using the data schema from Section 3. Style nodes by type and risk level, implement click-to-expand, and add the hierarchical layout.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Build a complete Cytoscape.js supply chain knowledge graph implementation. Single HTML file that I can open locally. Use CDN: https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js
+
+Graph data (use this realistic scenario):
+- VW Golf MQB program → infotainment assembly → display controller part (SPOF!)
+- Display controller part ← Tier-1 supplier: Continental AG (Germany, LOW risk)
+- Continental AG site: Ingolstadt plant
+- Continental AG ← component from Tier-2 supplier: Liqtech Semiconductor (Malaysia, CRITICAL financial risk)
+- Liqtech ← raw materials from Tier-3: RareMin Corp (Myanmar, HIGH geopolitical risk)
+- Display controller also used in: Tiguan, ID.4 programs
+- A second Tier-2 supplier: Murata Electronics (Japan, LOW risk) also supplies Continental
+
+Requirements:
+1. Style nodes with distinct visual appearance per type (OEM=diamond, Program=rectangle, Plant=factory icon via emoji label, Supplier=circle, Part=hexagon, Assembly=rounded-rect)
+2. Color-code by risk_level: Critical=#ef4444, High=#f97316, Medium=#eab308, Low=#22c55e, None=#64748b
+3. SPOF nodes get a pulsing red ring animation (CSS @keyframes)
+4. dagre hierarchical layout (top-down)
+5. Click a node → log node data to console + visually highlight its direct neighbors (fade all others to 30% opacity)
+6. Double-click a node → "expand" effect (animate node to slightly larger size, then back, as placeholder for real expansion)
+7. Canvas background: #0d1929. Node labels: white. Edge color: #334155.
+
+Full working code only, no placeholders.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s6" data-model="sonnet-code">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Impact path trace animation: the hero demo moment</span>
+        <span class="tag tag-tech">Tech</span>
+        <span class="tag tag-ux">UX</span>
+      </div>
+      <p class="card-desc">The centrepiece interaction: user selects a risky Tier-2 supplier → clicks "Trace Impact" → animated path flows from supplier through Tier-1 → Part → Assembly → Plant → Program, with affected nodes turning orange/red.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Implement the "Impact Path Trace" animation — the hero interaction of the supply chain graph explorer prototype. This is the key wow-moment for the VW presentation.
+
+Scenario: User clicks the Liqtech Semiconductor node (Tier-2, CRITICAL financial risk) → clicks "Trace Impact" button that appears in the side panel or as a floating action → the graph animates to show the blast radius.
+
+Implement in Cytoscape.js:
+
+Step 1 — Setup: All non-path nodes fade to 20% opacity. Non-path edges fade to 10%.
+
+Step 2 — Animation sequence (timed, sequential):
+- 0ms: Liqtech node pulses with a red glow (scale up 1.3x, back to 1.0x)
+- 500ms: The edge from Liqtech → Continental turns red and gets a moving dash animation (animated stroke-dashoffset)
+- 1000ms: Continental node turns orange (risk received), pulses
+- 1500ms: Edge Continental → Display Controller turns orange, animates
+- 2000ms: Display Controller (SPOF!) node turns red with strong pulse, a warning badge appears
+- 2500ms: Edges from Display Controller → Golf MQB and → Tiguan and → ID.4 turn red, animate
+- 3000ms: Program nodes (Golf MQB, Tiguan, ID.4) turn red, pulse
+
+Step 3 — Impact summary panel slides in from right showing: "3 vehicle programs affected | 1 SPOF in critical path | Estimated production risk: 2 plants"
+
+Step 4 — "Reset" button restores original state with a smooth fade-back animation.
+
+Provide complete JavaScript implementation using Cytoscape.js anime-style sequential callbacks or setTimeout chains. Include the CSS for the animated edge dash effect. This should work as a standalone addition to the existing graph HTML.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+<div class="card" data-section="s6" data-model="sonnet-code-long">
+  <div class="card-top">
+    <label class="card-check"><input type="checkbox" onchange="toggleDone(this)"><span class="chk">✓</span></label>
+    <div class="card-body">
+      <div class="card-title-row">
+        <span class="card-title">Full integrated prototype: assemble all pieces into one demo file</span>
+        <span class="tag tag-tech">Tech</span>
+        <span class="tag tag-vw">VW context</span>
+      </div>
+      <p class="card-desc">Final integration: combine the shell layout, graph data, node styles, side panel, filter toolbar, alert indicator, and impact trace animation into a single polished HTML file ready for the VW presentation.</p>
+      <button class="prompt-toggle" onclick="togglePrompt(this)"><span class="arrow">▶</span> Show AI prompt</button>
+      <div class="prompt-block">
+        <div class="prompt-label">Prompt — paste into Claude / ChatGPT</div>
+        <div class="prompt-text">Build the complete, integrated, presentation-ready supply chain graph explorer prototype as a single HTML file. This will be shown live to Volkswagen Group executives as a hi-fi prototype of the Graph Explorer module of the N-tier Supplier Monitor.
+
+Requirements summary:
+- Single HTML file, all CSS and JS inline, CDN for Cytoscape.js and dagre layout
+- Full-screen dark-mode layout (background #0d1929) with VW dark blue (#001e50) top bar
+- Top bar: "N-tier Supplier Monitor" logo left, breadcrumb center, alert bell + settings right
+- Graph canvas fills the screen with Cytoscape.js
+- Right side panel (300px, slides in on node click): shows node details for selected node
+- Floating bottom-left controls: zoom in/out/fit/reset
+- Filter bar (collapsible, below top bar): filter by Tier Level, Risk Level, Node Type
+- Legend overlay (top-right, collapsible)
+
+Graph data (realistic Volkswagen scenario):
+- Full chain: RareMin Corp (Tier-3, Myanmar, HIGH geo risk) → Liqtech Semiconductor (Tier-2, Malaysia, CRITICAL financial risk) → Continental AG (Tier-1, Germany, MEDIUM risk) → Display Controller Part (SPOF, HIGH risk) → Infotainment Assembly → Golf MQB, Tiguan, ID.4 programs + Wolfsburg Plant, Emden Plant
+- Include a second healthy chain for contrast: Bosch (Tier-1, LOW) → Battery Management Part → ID.4 program only
+
+Node styles: color by risk level, SPOF pulsing animation, node size by tier (Tier-1 largest)
+
+Key interactions:
+1. Click node → side panel shows details
+2. "Trace Impact" button on side panel → runs the sequential impact path animation
+3. Filter chips → filters which nodes are visible
+4. Hover edge → tooltip shows relationship type
+
+The prototype must feel polished and demo-ready: smooth animations, professional typography (Segoe UI or system font), no bugs, works offline except for CDN libs.</div>
+        <div class="copy-btn"><button onclick="copyPrompt(this)">Copy prompt</button></div>
+      </div>
+    </div>
+    <div class="done-badge"><span class="done-stamp">Done ✓</span></div>
+  </div>
+</div>
+
+
+<!-- Footer note -->
+<div class="footer-note">
+  <strong>How to use:</strong> Work through sections in order. Each card shows the recommended model and settings — use <strong>Claude Opus 4 with Extended Thinking</strong> for Section 0 and the two competitive/VW cards in Section 4 (strategy, synthesis, industry knowledge); <strong>Claude Sonnet 4</strong> for everything else. Copy the AI prompt → run it in your Claude Project (with the architecture file and project instructions attached) → save the output as a <code>.md</code> file in this folder (e.g., <code>s0-01-decisions.md</code>). Mark the card done. Upload each saved file back to the Project so later prompts — especially Section 6 — build on earlier findings.
+</div>
+
+</div><!-- /main -->
+
+<script>
+  function toggleDone(checkbox) {
+    const card = checkbox.closest('.card');
+    if (checkbox.checked) {
+      card.classList.add('done');
+    } else {
+      card.classList.remove('done');
+    }
+    updateProgress();
+  }
+
+  function togglePrompt(btn) {
+    const block = btn.nextElementSibling;
+    block.classList.toggle('open');
+    btn.classList.toggle('open');
+    btn.querySelector('.arrow').textContent = block.classList.contains('open') ? '▼' : '▶';
+  }
+
+  function copyPrompt(btn) {
+    const text = btn.closest('.prompt-block').querySelector('.prompt-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = orig, 1800);
+    });
+  }
+
+  function updateProgress() {
+    const total = document.querySelectorAll('.card').length;
+    const done = document.querySelectorAll('.card.done').length;
+    const pct = Math.round((done / total) * 100);
+
+    document.getElementById('bar-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = done + ' of ' + total + ' done';
+
+    // Update section counts
+    const sections = ['s0','s1','s2','s3','s4','s5','s6'];
+    sections.forEach(s => {
+      const cards = document.querySelectorAll(`.card[data-section="${s}"]`);
+      const doneCards = document.querySelectorAll(`.card[data-section="${s}"].done`);
+      const el = document.getElementById('count-' + s);
+      if (el) el.textContent = doneCards.length + '/' + cards.length;
+    });
+  }
+
+  // Model recommendation renderer
+  const MODEL_CONFIGS = {
+    'opus-think':    { label: 'Claude Opus 4',   cls: 'opus',   pips: ['Extended Thinking', 'Temp 0.5'] },
+    'sonnet-creative':{ label: 'Claude Sonnet 4', cls: 'sonnet', pips: ['Temp 0.7'] },
+    'sonnet-balanced':{ label: 'Claude Sonnet 4', cls: 'sonnet', pips: ['Temp 0.5'] },
+    'sonnet-precise': { label: 'Claude Sonnet 4', cls: 'sonnet', pips: ['Temp 0.3'] },
+    'sonnet-code':    { label: 'Claude Sonnet 4', cls: 'sonnet', pips: ['Temp 0.3', 'Code output'] },
+    'sonnet-code-long':{ label: 'Claude Sonnet 4', cls: 'sonnet', pips: ['Temp 0.3', 'Code output', 'Max output length'] },
+  };
+
+  const PIP_CLASS = {
+    'Extended Thinking': 'think',
+    'Max output length': 'long',
+  };
+
+  document.querySelectorAll('.card[data-model]').forEach(card => {
+    const key = card.dataset.model;
+    const cfg = MODEL_CONFIGS[key];
+    if (!cfg) return;
+
+    const body = card.querySelector('.card-body');
+    const toggleBtn = body.querySelector('.prompt-toggle');
+
+    const bar = document.createElement('div');
+    bar.className = 'model-rec';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'model-rec-label';
+    lbl.textContent = 'Use:';
+    bar.appendChild(lbl);
+
+    const badge = document.createElement('span');
+    badge.className = `model-badge ${cfg.cls}`;
+    badge.textContent = cfg.label;
+    bar.appendChild(badge);
+
+    cfg.pips.forEach(p => {
+      const pip = document.createElement('span');
+      pip.className = `model-pip ${PIP_CLASS[p] || 'temp'}`;
+      pip.textContent = p;
+      bar.appendChild(pip);
+    });
+
+    // Insert before the prompt toggle button
+    body.insertBefore(bar, toggleBtn);
+  });
+
+  // Init count
+  updateProgress();
+</script>
+</body>
+</html>
