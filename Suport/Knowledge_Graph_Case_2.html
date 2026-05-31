@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vehicle Chassis Supply Chain Knowledge Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #102d3a;
+      --muted: #5d7180;
+      --line: #d7e0e7;
+      --accent: #007c89;
+      --highlight: #ffb000;
+      --oem: #dfe5e8;
+      --company: #ffffff;
+      --plant: #d8f2f8;
+      --tier1-component: #009a8a;
+      --subsystem: #064f5a;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: minmax(720px, 1fr) 360px;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 14px 18px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #f9fbfc;
+    }
+
+    main {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #graph-container {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(16, 45, 58, 0.035) 1px, transparent 1px),
+        linear-gradient(rgba(16, 45, 58, 0.035) 1px, transparent 1px);
+      background-size: 34px 34px;
+    }
+
+    #details-panel {
+      min-height: 0;
+      overflow: auto;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      padding: 18px;
+    }
+
+    #legend {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: 310px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(16, 45, 58, 0.10);
+      font-size: 12px;
+    }
+
+    .sample-data-note {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 5;
+      padding: 6px 9px;
+      color: #b95300;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(255, 138, 0, 0.45);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .legend-title {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid rgba(16, 45, 58, 0.35);
+      flex: 0 0 auto;
+    }
+
+    .edge-sample {
+      width: 26px;
+      height: 0;
+      border-top: 2px solid #56707c;
+      flex: 0 0 auto;
+    }
+
+    .edge-sample.dashed {
+      border-top-style: dashed;
+    }
+
+    .edge-sample.part {
+      border-top-color: var(--accent);
+    }
+
+    .panel-kicker {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .panel-title {
+      margin: 0 0 10px;
+      font-size: 23px;
+      line-height: 1.15;
+    }
+
+    .panel-subtitle {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .tag {
+      padding: 5px 8px;
+      border-radius: 4px;
+      background: #eef4f6;
+      border: 1px solid #d7e2e7;
+      color: #254756;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .detail-section {
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .detail-section h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    .detail-section p {
+      margin: 0;
+      color: #314d5a;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .neighbor-list {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .neighbor-list li {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfd;
+      font-size: 13px;
+    }
+
+    .neighbor-list span:last-child {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .hint {
+      margin-top: 14px;
+      padding: 10px;
+      border-left: 3px solid var(--accent);
+      background: #eef8f9;
+      color: #274852;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .tooltip {
+      position: absolute;
+      z-index: 20;
+      pointer-events: none;
+      padding: 7px 9px;
+      border-radius: 5px;
+      background: rgba(16, 45, 58, 0.94);
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.25;
+      opacity: 0;
+      transform: translate(-50%, calc(-100% - 12px));
+      transition: opacity 120ms ease;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    svg:active {
+      cursor: grabbing;
+    }
+
+    .tier-label {
+      fill: #0b5966;
+      font-size: 20px;
+      font-weight: 700;
+      opacity: 0.85;
+    }
+
+    .tier-rule {
+      stroke: rgba(0, 124, 137, 0.15);
+      stroke-width: 1;
+    }
+
+    .link {
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      opacity: 0.72;
+    }
+
+    .link.supplies,
+    .link.produces {
+      stroke: #56707c;
+      stroke-dasharray: 7 6;
+    }
+
+    .link.belongs_to {
+      stroke: var(--accent);
+    }
+
+    .link.highlighted {
+      stroke: var(--highlight);
+      opacity: 1;
+      stroke-width: 3.5;
+      stroke-dasharray: none;
+    }
+
+    .edge-label {
+      fill: #2f6470;
+      font-size: 11px;
+      font-weight: 700;
+      paint-order: stroke;
+      stroke: #f6f8fb;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node-shape {
+      stroke: rgba(16, 45, 58, 0.75);
+      stroke-width: 1.5;
+      filter: drop-shadow(0 4px 7px rgba(16, 45, 58, 0.15));
+    }
+
+    .node.selected .node-shape {
+      stroke: var(--highlight);
+      stroke-width: 4;
+    }
+
+    .node.neighbor .node-shape {
+      stroke: #1d6fe3;
+      stroke-width: 3;
+    }
+
+    .node.risk-affected .node-shape {
+      stroke: #ff8a00;
+      stroke-width: 4;
+    }
+
+    .warning-icon {
+      cursor: pointer;
+      filter: drop-shadow(0 3px 5px rgba(16, 45, 58, 0.25));
+    }
+
+    .warning-icon circle {
+      fill: #ffb000;
+      stroke: #a75a00;
+      stroke-width: 1.5;
+    }
+
+    .warning-icon text {
+      fill: #3b2500;
+      font-size: 18px;
+      font-weight: 900;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .source-list li {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfd;
+    }
+
+    .source-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .source-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: #eef4f6;
+      border: 1px solid #d7e2e7;
+      color: #274852;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .source-list strong {
+      display: block;
+      color: #005d74;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .source-list a {
+      display: block;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .source-url {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .node.dimmed {
+      opacity: 0.28;
+    }
+
+    .node-label {
+      fill: #073945;
+      font-size: 12px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .node-label.light {
+      fill: #e9fff1;
+    }
+
+    .toolbar {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(16, 45, 58, 0.08);
+    }
+
+    .toolbar button {
+      width: 31px;
+      height: 31px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .toolbar button:hover {
+      border-color: var(--accent);
+    }
+
+    @media (max-width: 960px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 66vh auto;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      #details-panel {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .header-meta {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <h1>Vehicle Chassis Supply Chain</h1>
+      <div class="header-meta">
+        <span class="badge">Interactive knowledge graph</span>
+        <span class="badge">Click nodes for supply context</span>
+        <span class="badge">Plant closure risk</span>
+      </div>
+    </header>
+
+    <main>
+      <div id="graph-container"></div>
+      <div class="toolbar" aria-label="Graph controls">
+        <button type="button" id="zoom-in" title="Zoom in">+</button>
+        <button type="button" id="zoom-out" title="Zoom out">-</button>
+        <button type="button" id="zoom-reset" title="Reset view">=</button>
+      </div>
+      <aside id="legend"></aside>
+      <div class="sample-data-note">Sample data created for demonstration purposes</div>
+      <div id="tooltip" class="tooltip"></div>
+    </main>
+
+    <aside id="details-panel"></aside>
+  </div>
+
+  <script>
+    /*
+      D3.js is used because this graph needs custom SVG shapes, readable fixed labels,
+      fixed-position rendering, zoom/pan, and direct control of click highlighting.
+
+      Assumptions from the image:
+      - The graph models sample chassis-module supply data for demonstration purposes.
+      - Supplier and plant names are treated as scenario data, not verified site claims.
+      - Edge direction follows material or component flow toward the vehicle platform.
+      - Coordinates are fixed so blocks remain in place and supplier/plant nodes stay to the right of the linked component.
+    */
+    const graphData = {
+      nodes: [
+        {
+          id: "meb_platform",
+          label: "MEB",
+          type: "system",
+          category: "OEM",
+          tier: "OEM - Platform",
+          description: "Vehicle platform shown at the top of the chassis supply chain.",
+          metadata: {
+            roleInSupplyChain: "Final platform receiving the integrated vehicle chassis.",
+            examples: ["OEM platform architecture"],
+            notes: "Displayed as the OEM platform in the source graph."
+          }
+        },
+        {
+          id: "vehicle_chassis",
+          label: "Vehicle Chassis",
+          type: "system",
+          category: "Subsystem",
+          tier: "OEM - System",
+          description: "Main OEM system block for the vehicle chassis.",
+          metadata: {
+            roleInSupplyChain: "OEM-level system integrated into the vehicle platform.",
+            examples: ["Vehicle chassis"],
+            notes: "Wolfsburg Plant (DE) is shown as producing this system."
+          }
+        },
+        {
+          id: "wolfsburg_plant",
+          label: "Wolfsburg Plant (DE)",
+          type: "plant",
+          category: "Plant",
+          tier: "OEM - System",
+          description: "Manufacturing plant shown as producing the vehicle chassis.",
+          metadata: {
+            roleInSupplyChain: "Production site for the vehicle chassis.",
+            examples: ["Vehicle assembly plant"],
+            notes: "Company ownership is not specified in the diagram."
+          }
+        },
+        {
+          id: "rear_chassis_module",
+          label: "Rear Chassis Module",
+          type: "product",
+          category: "Tier1",
+          tier: "Tier 1",
+          description: "Tier 1 rear chassis module belonging to the vehicle chassis.",
+          metadata: {
+            roleInSupplyChain: "Major chassis module supplied into the vehicle chassis.",
+            examples: ["Rear chassis module"],
+            notes: "Supplied by Benteler and produced at Düsseldorf Plant (DE) according to the diagram."
+          }
+        },
+        {
+          id: "brodier_module",
+          label: "Benteler",
+          type: "company",
+          category: "Company",
+          tier: "Tier 1",
+          description: "Tier 1 supplier shown as supplying the rear chassis module.",
+          metadata: {
+            roleInSupplyChain: "Supplier of the rear chassis module.",
+            examples: ["Chassis module supplier"],
+            notes: "Displayed next to the rear chassis module node."
+          }
+        },
+        {
+          id: "dusseldorf_plant",
+          label: "Dusseldorf Plant (DE)",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 1",
+          description: "Manufacturing plant shown as producing the rear chassis module.",
+          metadata: {
+            roleInSupplyChain: "Production site for the rear chassis module.",
+            examples: ["Chassis module assembly plant"],
+            notes: "Displayed next to the rear chassis module node."
+          }
+        },
+        {
+          id: "steel_tubes",
+          label: "Steel Tubes",
+          type: "product",
+          category: "Tier1",
+          tier: "Tier 1",
+          description: "Tier 1 steel tube component belonging to the rear chassis module.",
+          metadata: {
+            roleInSupplyChain: "Structural component used in the rear chassis module.",
+            examples: ["Chassis steel tubes"],
+            notes: "Supplied by Benteler and produced at Lingen Plant (DE) according to the diagram."
+          }
+        },
+        {
+          id: "brodier_tubes",
+          label: "Benteler",
+          type: "company",
+          category: "Company",
+          tier: "Tier 1",
+          description: "Supplier shown as supplying steel tubes.",
+          metadata: {
+            roleInSupplyChain: "Supplier of steel tubes used in the rear chassis module.",
+            examples: ["Tube supplier"],
+            notes: "Displayed next to the steel tubes node."
+          }
+        },
+        {
+          id: "liuzhou_plant",
+          label: "Lingen Plant (DE)",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 1",
+          description: "Manufacturing plant shown as producing steel tubes.",
+          metadata: {
+            roleInSupplyChain: "Production site for steel tubes.",
+            examples: ["Steel tube production plant"],
+            notes: "Displayed next to the steel tubes node."
+          }
+        },
+        {
+          id: "suspension_spring",
+          label: "Suspension Spring",
+          type: "product",
+          category: "Tier2",
+          tier: "Tier 2",
+          description: "Tier 2 suspension spring belonging to the rear chassis module.",
+          metadata: {
+            roleInSupplyChain: "Suspension component used in the rear chassis module.",
+            examples: ["Suspension spring"],
+            notes: "Supplied by ThyssenKrupp and produced at Hagen Plant (DE) according to the diagram."
+          }
+        },
+        {
+          id: "thyssenkrupp",
+          label: "ThyssenKrupp",
+          type: "company",
+          category: "Company",
+          tier: "Tier 2",
+          description: "Supplier shown as supplying the suspension spring.",
+          metadata: {
+            roleInSupplyChain: "Supplier of suspension springs used in the rear chassis module.",
+            examples: ["Spring supplier"],
+            notes: "The warning marker highlights the Hagen suspension-spring plant closure risk and its impact path into the chassis supply chain."
+          }
+        },
+        {
+          id: "hagen_plant",
+          label: "Hagen Plant (DE)",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 2",
+          description: "Manufacturing plant shown as producing the suspension spring.",
+          metadata: {
+            roleInSupplyChain: "Production site for suspension springs.",
+            examples: ["Spring production plant"],
+            notes: "Displayed next to the suspension spring node."
+          }
+        },
+        {
+          id: "steel",
+          label: "Steel",
+          type: "material",
+          category: "RawMaterial",
+          tier: "Tier 2",
+          description: "Raw material shown as feeding steel tubes and suspension springs.",
+          metadata: {
+            roleInSupplyChain: "Base material for steel tubes and suspension springs.",
+            examples: ["Steel raw material"],
+            notes: "The source image labels the relation to components as belongs_to."
+          }
+        },
+        {
+          id: "unknown_supplier",
+          label: "Unknown Supplier",
+          type: "company",
+          category: "Company",
+          tier: "Tier 2",
+          description: "Unidentified supplier shown as supplying steel.",
+          metadata: {
+            roleInSupplyChain: "Upstream supplier of steel material.",
+            examples: ["Raw material supplier"],
+            notes: "Supplier name is unknown in the source diagram."
+          }
+        },
+        {
+          id: "unknown_plant",
+          label: "Unknown Plant (DE)",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 2",
+          description: "Unidentified plant shown as producing steel.",
+          metadata: {
+            roleInSupplyChain: "Production site for steel material.",
+            examples: ["Steel production plant"],
+            notes: "Plant name is unknown in the source diagram."
+          }
+        }
+      ],
+      links: [
+        {
+          source: "vehicle_chassis",
+          target: "meb_platform",
+          relation: "belongs_to",
+          description: "The vehicle chassis is part of the MEB platform."
+        },
+        {
+          source: "wolfsburg_plant",
+          target: "vehicle_chassis",
+          relation: "produces",
+          description: "Wolfsburg Plant (DE) produces the vehicle chassis."
+        },
+        {
+          source: "rear_chassis_module",
+          target: "vehicle_chassis",
+          relation: "belongs_to",
+          description: "The rear chassis module is part of the vehicle chassis."
+        },
+        {
+          source: "brodier_module",
+          target: "rear_chassis_module",
+          relation: "supplies",
+          description: "Benteler supplies the rear chassis module."
+        },
+        {
+          source: "dusseldorf_plant",
+          target: "rear_chassis_module",
+          relation: "produces",
+          description: "Dusseldorf Plant (DE) produces the rear chassis module."
+        },
+        {
+          source: "steel_tubes",
+          target: "rear_chassis_module",
+          relation: "belongs_to",
+          description: "Steel tubes are part of the rear chassis module."
+        },
+        {
+          source: "brodier_tubes",
+          target: "steel_tubes",
+          relation: "supplies",
+          description: "Benteler supplies steel tubes."
+        },
+        {
+          source: "liuzhou_plant",
+          target: "steel_tubes",
+          relation: "produces",
+          description: "Lingen Plant (DE) produces steel tubes."
+        },
+        {
+          source: "suspension_spring",
+          target: "rear_chassis_module",
+          relation: "belongs_to",
+          description: "The suspension spring is part of the rear chassis module."
+        },
+        {
+          source: "thyssenkrupp",
+          target: "suspension_spring",
+          relation: "supplies",
+          description: "ThyssenKrupp supplies the suspension spring."
+        },
+        {
+          source: "hagen_plant",
+          target: "suspension_spring",
+          relation: "produces",
+          description: "Hagen Plant (DE) produces the suspension spring."
+        },
+        {
+          source: "steel",
+          target: "steel_tubes",
+          relation: "belongs_to",
+          description: "Steel is contained in the steel tubes."
+        },
+        {
+          source: "unknown_supplier",
+          target: "steel",
+          relation: "supplies",
+          description: "Unknown Supplier supplies steel."
+        },
+        {
+          source: "unknown_plant",
+          target: "steel",
+          relation: "produces",
+          description: "Unknown Plant (DE) produces steel."
+        }
+      ]
+    };
+
+    const categoryStyles = {
+      OEM: { color: "#dfe5e8", text: "#073945", shape: "rect", width: 160, height: 44 },
+      Subsystem: { color: "#064f5a", text: "#e9fff1", shape: "roundRect", width: 174, height: 86 },
+      Tier1: { color: "#009a8a", text: "#e9fff1", shape: "roundRect", width: 168, height: 84 },
+      Tier2: { color: "#92dfac", text: "#073945", shape: "roundRect", width: 168, height: 84 },
+      RawMaterial: { color: "#d7dadd", text: "#073945", shape: "rect", width: 168, height: 78 },
+      Company: { color: "#ffffff", text: "#073945", shape: "supplier", width: 150, height: 34 },
+      Plant: { color: "#d8f2f8", text: "#073945", shape: "supplier", width: 150, height: 32 },
+      Other: { color: "#ffffff", text: "#073945", shape: "pill", width: 116, height: 32 }
+    };
+
+    const plantClosureWarning = {
+      id: "plant_closure_risk_warning",
+      nodeId: "hagen_plant",
+      title: "Suspension Spring Plant Closure Risk",
+      summary: "thyssenkrupp Automotive Technology decided to gradually scale back production at the Hagen Springs and Stabilizers site and close the local Competence Center, with about 300 jobs to be cut over two years. The company cites weak European automotive demand, low site utilization, high energy and labor costs in Germany, and rising competition from China. In this supply-chain scenario, the closure is a VW disruption risk because suspension springs are bulky and heavy components that are not normally buffered in large stock.",
+      affectedNodeIds: [
+        "hagen_plant",
+        "suspension_spring",
+        "rear_chassis_module",
+        "vehicle_chassis",
+        "meb_platform"
+      ],
+      sources: [
+        {
+          region: "Sample",
+          sourceType: "Official company press release",
+          label: "thyssenkrupp Automotive Technology: phase-out of Hagen Springs and Stabilizers site",
+          detail: "Reports the decision to gradually scale back production at Hagen, close the Competence Center, and cut about 300 jobs over two years; cites weak demand, low utilization, high German energy and labor costs, and competition from China.",
+          url: "https://www.thyssenkrupp-automotive-technology.com/en/press-detail/springs-and-stabilizers%3A-management-decides-to-gradually-phase-out-production-site-in-hagen-297551"
+        },
+        {
+          region: "Germany",
+          sourceType: "Video report",
+          label: "YouTube report on thyssenkrupp Hagen plant closure",
+          detail: "Video source provided for the plant-closure context around thyssenkrupp's suspension spring production in Germany.",
+          url: "https://www.youtube.com/watch?v=t8m2qqb0AME"
+        }
+      ]
+    };
+
+    const steelIndustryWarning = {
+      id: "steel_industry_pressure_warning",
+      nodeId: "steel",
+      title: "Steel Industry Economic Pressure Risk",
+      summary: "The steel node is marked with an industry and economic pressure risk. Recent German automotive-market forecasts still point to a weak recovery versus pre-crisis levels, reducing demand pressure from automotive customers, while steel production remains exposed to electricity and energy-cost pressure. For the VW chassis chain, this creates upstream risk for steel inputs that feed steel tubes and then the rear chassis module.",
+      affectedNodeIds: [
+        "steel",
+        "steel_tubes",
+        "rear_chassis_module",
+        "vehicle_chassis",
+        "meb_platform"
+      ],
+      sources: [
+        {
+          region: "Germany",
+          sourceType: "Automotive industry association",
+          label: "VDA: Production and market in Germany, January 2026",
+          detail: "Reports a weak January 2026 start for the German passenger-car market, with new registrations down 7 percent year over year.",
+          url: "https://www.vda.de/en/press/press-releases/2026/260204_Car-production-in-Germany-in-January_2026"
+        },
+        {
+          region: "Germany",
+          sourceType: "Automotive industry association",
+          label: "VDA: Forecasts for 2026",
+          detail: "States that the German passenger-car market is expected to recover only moderately in 2026 and remain around one fifth below the pre-crisis year 2019.",
+          url: "https://www.vda.de/en/press/press-releases/2025/251208_PM_Forecasts_2026"
+        },
+        {
+          region: "Germany",
+          sourceType: "Steel industry association",
+          label: "WV Stahl: Steel industry perspective on the Automotive Package",
+          detail: "February 2026 position paper describing the automotive package as important for aligning climate, industrial, and competitiveness objectives, including stabilising demand for key materials.",
+          url: "https://www.wvstahl.de/publikationen/position-the-perspective-of-the-steel-industry-in-germany-on-the-automotive-package/"
+        },
+        {
+          region: "Germany",
+          sourceType: "Steel industry association",
+          label: "WV Stahl: Energy prices must be lowered to strengthen resilience",
+          detail: "April 2026 statement stressing that stable, competitive energy prices are important for the steel industry and energy-intensive sectors.",
+          url: "https://www.wvstahl.de/statements/resilienz-staerken-heisst-energiepreise-senken/"
+        }
+      ]
+    };
+
+    const warnings = [plantClosureWarning, steelIndustryWarning];
+
+    const tierY = {
+      "OEM - Platform": 46,
+      "OEM - System": 146,
+      "Tier 1": 300,
+      "Tier 2": 650
+    };
+
+    const tierLabels = [
+      ["OEM - Platform", 46, 112],
+      ["OEM - System", 146, 256],
+      ["Tier 1", 300, 570],
+      ["Tier 2", 650, null]
+    ];
+
+    const fixedPositions = {
+      meb_platform: { x: 720, y: 46 },
+      vehicle_chassis: { x: 720, y: 162 },
+      wolfsburg_plant: { x: 1000, y: 162 },
+      rear_chassis_module: { x: 720, y: 332 },
+      brodier_module: { x: 1000, y: 312 },
+      dusseldorf_plant: { x: 1000, y: 352 },
+      steel_tubes: { x: 720, y: 506 },
+      brodier_tubes: { x: 1000, y: 486 },
+      liuzhou_plant: { x: 1000, y: 526 },
+      suspension_spring: { x: 260, y: 680 },
+      thyssenkrupp: { x: 510, y: 660 },
+      hagen_plant: { x: 510, y: 700 },
+      steel: { x: 720, y: 710 },
+      unknown_supplier: { x: 1000, y: 690 },
+      unknown_plant: { x: 1000, y: 730 }
+    };
+
+    const container = document.getElementById("graph-container");
+    const detailsPanel = document.getElementById("details-panel");
+    const legend = document.getElementById("legend");
+    const tooltip = document.getElementById("tooltip");
+    const width = Math.max(container.clientWidth, 1140);
+    const height = Math.max(container.clientHeight, 820);
+
+    const nodes = graphData.nodes.map((node) => ({ ...node }));
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const links = graphData.links.map((link) => ({
+      ...link,
+      source: nodeById.get(link.source),
+      target: nodeById.get(link.target)
+    }));
+
+    const svg = d3.select("#graph-container")
+      .append("svg")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("role", "img")
+      .attr("aria-label", "Interactive vehicle chassis supply chain knowledge graph with a plant closure warning");
+
+    svg.append("defs").html(`
+      <marker id="arrow-supply" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,-5L10,0L0,5" fill="#56707c"></path>
+      </marker>
+      <marker id="arrow-part" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,-5L10,0L0,5" fill="#007c89"></path>
+      </marker>
+      <marker id="arrow-highlight" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M0,-5L10,0L0,5" fill="#ffb000"></path>
+      </marker>
+    `);
+
+    const zoomLayer = svg.append("g");
+    const tierLayer = zoomLayer.append("g").attr("class", "tiers");
+    const linkLayer = zoomLayer.append("g").attr("class", "links");
+    const labelLayer = zoomLayer.append("g").attr("class", "edge-labels");
+    const nodeLayer = zoomLayer.append("g").attr("class", "nodes");
+
+    tierLayer.selectAll("line")
+      .data(tierLabels.filter((d) => d[2] !== null))
+      .join("line")
+      .attr("class", "tier-rule")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", (d) => d[2])
+      .attr("y2", (d) => d[2]);
+
+    tierLayer.selectAll("text")
+      .data(tierLabels)
+      .join("text")
+      .attr("class", "tier-label")
+      .attr("x", 22)
+      .attr("y", (d) => d[1] + 8)
+      .text((d) => d[0]);
+
+    const link = linkLayer.selectAll("path")
+      .data(links)
+      .join("path")
+      .attr("class", (d) => `link ${d.relation}`)
+      .attr("marker-end", (d) => d.relation === "belongs_to" ? "url(#arrow-part)" : "url(#arrow-supply)");
+
+    const edgeLabel = labelLayer.selectAll("text")
+      .data(links)
+      .join("text")
+      .attr("class", "edge-label")
+      .text((d) => `<${d.relation}>`);
+
+    const node = nodeLayer.selectAll("g")
+      .data(nodes)
+      .join("g")
+      .attr("class", "node")
+      .on("mouseenter", showTooltip)
+      .on("mousemove", moveTooltip)
+      .on("mouseleave", hideTooltip)
+      .on("click", (event, d) => {
+        event.stopPropagation();
+        selectNode(d.id);
+      });
+
+    node.each(function(d) {
+      const style = categoryStyles[d.category] || categoryStyles.Other;
+      d.nodeWidth = style.width;
+      d.nodeHeight = style.height;
+      const group = d3.select(this);
+
+      group.append("rect")
+        .attr("class", "node-shape")
+        .attr("x", -style.width / 2)
+        .attr("y", -style.height / 2)
+        .attr("width", style.width)
+        .attr("height", style.height)
+        .attr("rx", style.shape === "roundRect" ? 12 : 4)
+        .attr("fill", style.color);
+
+      const lines = wrapLabel(d.label, style.width - 18);
+      const lineHeight = 14;
+      group.selectAll("text.node-label")
+        .data(lines)
+        .join("text")
+        .attr("class", `node-label ${style.text === "#e9fff1" ? "light" : ""}`)
+        .attr("y", (_, i) => (i - (lines.length - 1) / 2) * lineHeight)
+        .text((line) => line);
+
+      const nodeWarnings = warnings.filter((warning) => warning.nodeId === d.id);
+      nodeWarnings.forEach((warningItem, index) => {
+        const warning = group.append("g")
+          .attr("class", "warning-icon")
+          .attr("transform", `translate(${style.width / 2 - 8},${-style.height / 2 + 8 + index * 28})`)
+          .attr("role", "button")
+          .attr("aria-label", `Show ${warningItem.title}`)
+          .on("mouseenter", (event) => {
+            event.stopPropagation();
+            tooltip.innerHTML = `<strong>${escapeHtml(warningItem.title)}</strong><br>Click to show affected chassis chain`;
+            tooltip.style.opacity = "1";
+            moveTooltip(event);
+          })
+          .on("mousemove", (event) => {
+            event.stopPropagation();
+            moveTooltip(event);
+          })
+          .on("mouseleave", (event) => {
+            event.stopPropagation();
+            hideTooltip();
+          })
+          .on("click", (event) => {
+            event.stopPropagation();
+            selectWarning(warningItem.id);
+          });
+
+        warning.append("circle")
+          .attr("r", 13);
+
+        warning.append("text")
+          .attr("y", 1)
+          .text("!");
+      });
+    });
+
+    nodes.forEach((node) => {
+      const position = fixedPositions[node.id] || { x: width / 2, y: tierY[node.tier] || height / 2 };
+      node.x = position.x;
+      node.y = position.y;
+    });
+
+    const zoom = d3.zoom()
+      .scaleExtent([0.55, 2.6])
+      .on("zoom", (event) => {
+        zoomLayer.attr("transform", event.transform);
+      });
+
+    svg.call(zoom).on("click", () => selectNode(null));
+
+    const initialTransform = d3.zoomIdentity.translate(8, 8).scale(Math.min(width / 1000, 1));
+    svg.call(zoom.transform, initialTransform);
+
+    document.getElementById("zoom-in").addEventListener("click", () => svg.transition().duration(180).call(zoom.scaleBy, 1.22));
+    document.getElementById("zoom-out").addEventListener("click", () => svg.transition().duration(180).call(zoom.scaleBy, 0.82));
+    document.getElementById("zoom-reset").addEventListener("click", () => svg.transition().duration(220).call(zoom.transform, initialTransform));
+
+    renderStaticGraph();
+    renderLegend();
+    renderDetails(null);
+
+    function renderStaticGraph() {
+      link.attr("d", (d) => {
+        const source = trimPoint(d.source, d.target);
+        const target = trimPoint(d.target, d.source);
+        if (d.source.id === "suspension_spring" && d.target.id === "rear_chassis_module") {
+          const cornerY = source.y - 230;
+          return `M${source.x},${source.y} L${source.x},${cornerY} L${target.x},${cornerY} L${target.x},${target.y}`;
+        }
+        const mx = (source.x + target.x) / 2;
+        const my = (source.y + target.y) / 2;
+        const curve = d.relation === "belongs_to" ? 0 : 16;
+        return `M${source.x},${source.y} Q${mx},${my - curve} ${target.x},${target.y}`;
+      });
+
+      edgeLabel
+        .attr("x", (d) => {
+          if (d.source.id === "suspension_spring" && d.target.id === "rear_chassis_module") {
+            return (d.source.x + d.target.x) / 2;
+          }
+          return (d.source.x + d.target.x) / 2;
+        })
+        .attr("y", (d) => {
+          if (d.source.id === "suspension_spring" && d.target.id === "rear_chassis_module") {
+            return d.source.y - 238;
+          }
+          return (d.source.y + d.target.y) / 2 - 8;
+        });
+
+      node.attr("transform", (d) => `translate(${d.x},${d.y})`);
+    }
+
+    function trimPoint(from, to) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.sqrt(dx * dx + dy * dy) || 1;
+      const padX = (from.nodeWidth || 120) / 2 + 8;
+      const padY = (from.nodeHeight || 60) / 2 + 8;
+      const scale = Math.min(Math.abs(dx) > 0 ? padX / Math.abs(dx) : Infinity, Math.abs(dy) > 0 ? padY / Math.abs(dy) : Infinity);
+      const pad = Math.min(scale * length, Math.max(padX, padY));
+      return {
+        x: from.x + dx / length * pad,
+        y: from.y + dy / length * pad
+      };
+    }
+
+    function wrapLabel(text, maxWidth) {
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = "";
+      const approxCharWidth = 6.7;
+
+      words.forEach((word) => {
+        const test = line ? `${line} ${word}` : word;
+        if (test.length * approxCharWidth > maxWidth && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      });
+      if (line) lines.push(line);
+      return lines.length ? lines : [text];
+    }
+
+    function showTooltip(event, d) {
+      tooltip.innerHTML = `<strong>${escapeHtml(d.label)}</strong><br>${escapeHtml(d.type)} | ${escapeHtml(d.category)}`;
+      tooltip.style.opacity = "1";
+      moveTooltip(event);
+    }
+
+    function moveTooltip(event) {
+      const rect = container.getBoundingClientRect();
+      tooltip.style.left = `${event.clientX - rect.left}px`;
+      tooltip.style.top = `${event.clientY - rect.top}px`;
+    }
+
+    function hideTooltip() {
+      tooltip.style.opacity = "0";
+    }
+
+    function selectNode(id) {
+      const selected = id ? nodeById.get(id) : null;
+      const neighborIds = new Set();
+      if (selected) {
+        links.forEach((linkDatum) => {
+          const sourceId = typeof linkDatum.source === "object" ? linkDatum.source.id : linkDatum.source;
+          const targetId = typeof linkDatum.target === "object" ? linkDatum.target.id : linkDatum.target;
+          if (sourceId === id) neighborIds.add(targetId);
+          if (targetId === id) neighborIds.add(sourceId);
+        });
+      }
+
+      node
+        .classed("selected", (d) => selected && d.id === selected.id)
+        .classed("neighbor", (d) => selected && neighborIds.has(d.id))
+        .classed("risk-affected", false)
+        .classed("dimmed", (d) => selected && d.id !== selected.id && !neighborIds.has(d.id));
+
+      link
+        .classed("highlighted", (d) => selected && (d.source.id === selected.id || d.target.id === selected.id))
+        .classed("dimmed", (d) => selected && d.source.id !== selected.id && d.target.id !== selected.id)
+        .attr("marker-end", (d) => {
+          if (selected && (d.source.id === selected.id || d.target.id === selected.id)) return "url(#arrow-highlight)";
+          return d.relation === "belongs_to" ? "url(#arrow-part)" : "url(#arrow-supply)";
+        });
+
+      edgeLabel.classed("dimmed", (d) => selected && d.source.id !== selected.id && d.target.id !== selected.id);
+      renderDetails(selected);
+    }
+
+    function selectWarning(id) {
+      const selectedWarning = warnings.find((warning) => warning.id === id);
+      if (!selectedWarning) return;
+      const affected = new Set(selectedWarning.affectedNodeIds);
+
+      node
+        .classed("selected", false)
+        .classed("neighbor", false)
+        .classed("risk-affected", (d) => affected.has(d.id))
+        .classed("dimmed", (d) => !affected.has(d.id));
+
+      link
+        .classed("highlighted", (d) => affected.has(d.source.id) && affected.has(d.target.id))
+        .classed("dimmed", (d) => !(affected.has(d.source.id) && affected.has(d.target.id)))
+        .attr("marker-end", (d) => {
+          if (affected.has(d.source.id) && affected.has(d.target.id)) return "url(#arrow-highlight)";
+          return d.relation === "belongs_to" ? "url(#arrow-part)" : "url(#arrow-supply)";
+        });
+
+      edgeLabel.classed("dimmed", (d) => !(affected.has(d.source.id) && affected.has(d.target.id)));
+      renderWarningDetails(selectedWarning);
+    }
+
+    function renderDetails(selected) {
+      if (!selected) {
+        detailsPanel.innerHTML = `
+          <p class="panel-kicker">Selection</p>
+          <h2 class="panel-title">Chassis Supply Chain Overview</h2>
+          <div class="panel-subtitle">
+            <span class="tag">${graphData.nodes.length} nodes</span>
+            <span class="tag">${graphData.links.length} relationships</span>
+          </div>
+          <div class="detail-section">
+            <h3>Graph Context</h3>
+            <p>This graph models a simplified chassis supply chain from steel and suspension spring inputs through steel tubes and the rear chassis module into the vehicle chassis and MEB platform. Select any node to inspect direct upstream suppliers and downstream customers.</p>
+          </div>
+          <div class="detail-section">
+            <h3>Risk Interaction</h3>
+            <p>The yellow warning markers open risk views for Hagen Plant closure and steel industry pressure, highlighting how upstream disruptions can propagate into the rear chassis module and vehicle platform.</p>
+          </div>
+          <div class="hint">Mouse wheel or trackpad zooms. Drag the canvas to pan. Node positions are fixed.</div>
+        `;
+        return;
+      }
+
+      const incoming = links
+        .filter((linkDatum) => linkDatum.target.id === selected.id)
+        .map((linkDatum) => ({ node: linkDatum.source, link: linkDatum }));
+      const outgoing = links
+        .filter((linkDatum) => linkDatum.source.id === selected.id)
+        .map((linkDatum) => ({ node: linkDatum.target, link: linkDatum }));
+
+      detailsPanel.innerHTML = `
+        <p class="panel-kicker">${escapeHtml(selected.tier)}</p>
+        <h2 class="panel-title">${escapeHtml(selected.label)}</h2>
+        <div class="panel-subtitle">
+          <span class="tag">${escapeHtml(selected.type)}</span>
+          <span class="tag">${escapeHtml(selected.category)}</span>
+        </div>
+        <div class="detail-section">
+          <h3>Description</h3>
+          <p>${escapeHtml(selected.description)}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Role In Supply Chain</h3>
+          <p>${escapeHtml(selected.metadata.roleInSupplyChain)}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Upstream Suppliers</h3>
+          ${renderNeighborList(incoming, "No direct upstream supplier shown.")}
+        </div>
+        <div class="detail-section">
+          <h3>Downstream Customers</h3>
+          ${renderNeighborList(outgoing, "No direct downstream customer shown.")}
+        </div>
+        <div class="detail-section">
+          <h3>Notes</h3>
+          <p>${escapeHtml(selected.metadata.notes)}</p>
+        </div>
+      `;
+    }
+
+    function renderWarningDetails(selectedWarning) {
+      const affectedNames = selectedWarning.affectedNodeIds
+        .map((id) => nodeById.get(id))
+        .filter(Boolean)
+        .map((item) => item.label);
+
+      detailsPanel.innerHTML = `
+        <p class="panel-kicker">Warning</p>
+        <h2 class="panel-title">${escapeHtml(selectedWarning.title)}</h2>
+        <div class="panel-subtitle">
+          <span class="tag">${selectedWarning.id === "steel_industry_pressure_warning" ? "Industry pressure risk" : "Plant closure risk"}</span>
+          <span class="tag">Supplier dependency</span>
+        </div>
+        <div class="detail-section">
+          <h3>Risk Explanation</h3>
+          <p>${escapeHtml(selectedWarning.summary)}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Affected Chassis Chain</h3>
+          <p>${escapeHtml(affectedNames.join(" -> "))}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Relevant Data Input</h3>
+          <ul class="source-list">
+            ${selectedWarning.sources.map((source) => `
+              <li>
+                <div class="source-meta">
+                  <span class="source-pill">${escapeHtml(source.region)}</span>
+                  <span class="source-pill">${escapeHtml(source.sourceType)}</span>
+                </div>
+                ${source.url
+                  ? `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label)}</a>`
+                  : `<strong>${escapeHtml(source.label)}</strong>`}
+                <div class="source-url">${escapeHtml(source.detail)}</div>
+              </li>
+            `).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    function renderNeighborList(items, emptyText) {
+      if (!items.length) return `<p>${emptyText}</p>`;
+      return `
+        <ul class="neighbor-list">
+          ${items.map((item) => `
+            <li>
+              <span>${escapeHtml(item.node.label)}</span>
+              <span>${escapeHtml(item.link.relation)}</span>
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+
+    function renderLegend() {
+      const categoryItems = [
+        ["OEM", "OEM / Platform"],
+        ["Subsystem", "System block"],
+        ["Tier1", "Tier 1 component"],
+        ["Tier2", "Tier 2 component"],
+        ["RawMaterial", "Raw material"],
+        ["Company", "Company"],
+        ["Plant", "Plant"]
+      ];
+
+      legend.innerHTML = `
+        <p class="legend-title">Legend</p>
+        <div class="legend-grid">
+          ${categoryItems.map(([key, label]) => `
+            <div class="legend-item">
+              <span class="swatch" style="background:${categoryStyles[key].color}"></span>
+              <span>${label}</span>
+            </div>
+          `).join("")}
+          <div class="legend-item">
+            <span class="edge-sample dashed"></span>
+            <span>supplies / produces</span>
+          </div>
+          <div class="legend-item">
+            <span class="edge-sample part"></span>
+            <span>belongs_to</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

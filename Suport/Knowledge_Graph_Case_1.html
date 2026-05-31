@@ -1,0 +1,1475 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thermal Management Supply Chain Knowledge Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #102d3a;
+      --muted: #5d7180;
+      --line: #d7e0e7;
+      --accent: #007c89;
+      --highlight: #ffb000;
+      --oem: #dfe5e8;
+      --company: #ffffff;
+      --plant: #d8f2f8;
+      --tier1-component: #009a8a;
+      --tier2-component: #4ab995;
+      --tier3-component: #92dfac;
+      --raw: #d7dadd;
+      --subsystem: #064f5a;
+      --component: #45b894;
+      --other: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: minmax(720px, 1fr) 360px;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 14px 18px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #f9fbfc;
+    }
+
+    main {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #graph-container {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(16, 45, 58, 0.035) 1px, transparent 1px),
+        linear-gradient(rgba(16, 45, 58, 0.035) 1px, transparent 1px);
+      background-size: 34px 34px;
+    }
+
+    #details-panel {
+      min-height: 0;
+      overflow: auto;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      padding: 18px;
+    }
+
+    #legend {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: 310px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(16, 45, 58, 0.10);
+      font-size: 12px;
+    }
+
+    .sample-data-note {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 5;
+      padding: 6px 9px;
+      color: #b95300;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(255, 138, 0, 0.45);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .legend-title {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid rgba(16, 45, 58, 0.35);
+      flex: 0 0 auto;
+    }
+
+    .edge-sample {
+      width: 26px;
+      height: 0;
+      border-top: 2px solid #56707c;
+      flex: 0 0 auto;
+    }
+
+    .edge-sample.dashed {
+      border-top-style: dashed;
+    }
+
+    .edge-sample.part {
+      border-top-color: var(--accent);
+    }
+
+    .panel-kicker {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .panel-title {
+      margin: 0 0 10px;
+      font-size: 23px;
+      line-height: 1.15;
+    }
+
+    .panel-subtitle {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .tag {
+      padding: 5px 8px;
+      border-radius: 4px;
+      background: #eef4f6;
+      border: 1px solid #d7e2e7;
+      color: #254756;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .detail-section {
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .detail-section h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    .detail-section p {
+      margin: 0;
+      color: #314d5a;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .neighbor-list {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .neighbor-list li {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfd;
+      font-size: 13px;
+    }
+
+    .neighbor-list span:last-child {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .hint {
+      margin-top: 14px;
+      padding: 10px;
+      border-left: 3px solid var(--accent);
+      background: #eef8f9;
+      color: #274852;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .tooltip {
+      position: absolute;
+      z-index: 20;
+      pointer-events: none;
+      padding: 7px 9px;
+      border-radius: 5px;
+      background: rgba(16, 45, 58, 0.94);
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.25;
+      opacity: 0;
+      transform: translate(-50%, calc(-100% - 12px));
+      transition: opacity 120ms ease;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    svg:active {
+      cursor: grabbing;
+    }
+
+    .tier-label {
+      fill: #0b5966;
+      font-size: 20px;
+      font-weight: 700;
+      opacity: 0.85;
+    }
+
+    .tier-rule {
+      stroke: rgba(0, 124, 137, 0.15);
+      stroke-width: 1;
+    }
+
+    .tier-band {
+      fill: rgba(215, 218, 221, 0.42);
+    }
+
+    .link {
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      opacity: 0.72;
+    }
+
+    .link.supplies,
+    .link.produces {
+      stroke: #56707c;
+      stroke-dasharray: 7 6;
+    }
+
+    .link.belongs_to {
+      stroke: var(--accent);
+    }
+
+    .link.other {
+      stroke: #8999a3;
+      stroke-dasharray: 2 5;
+    }
+
+    .link.highlighted {
+      stroke: var(--highlight);
+      opacity: 1;
+      stroke-width: 3.5;
+      stroke-dasharray: none;
+    }
+
+    .edge-label {
+      fill: #2f6470;
+      font-size: 11px;
+      font-weight: 700;
+      paint-order: stroke;
+      stroke: #f6f8fb;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node-shape {
+      stroke: rgba(16, 45, 58, 0.75);
+      stroke-width: 1.5;
+      filter: drop-shadow(0 4px 7px rgba(16, 45, 58, 0.15));
+    }
+
+    .node.selected .node-shape {
+      stroke: var(--highlight);
+      stroke-width: 4;
+    }
+
+    .node.neighbor .node-shape {
+      stroke: #1d6fe3;
+      stroke-width: 3;
+    }
+
+    .node.risk-affected .node-shape {
+      stroke: #ff8a00;
+      stroke-width: 4;
+    }
+
+    .warning-icon {
+      cursor: pointer;
+      filter: drop-shadow(0 3px 5px rgba(16, 45, 58, 0.25));
+    }
+
+    .warning-icon circle {
+      fill: #ffb000;
+      stroke: #a75a00;
+      stroke-width: 1.5;
+    }
+
+    .warning-icon text {
+      fill: #3b2500;
+      font-size: 18px;
+      font-weight: 900;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .source-list li {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfd;
+    }
+
+    .source-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .source-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: #eef4f6;
+      border: 1px solid #d7e2e7;
+      color: #274852;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .source-list a {
+      color: #005d74;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .source-url {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .node.dimmed {
+      opacity: 0.28;
+    }
+
+    .node-label {
+      fill: #073945;
+      font-size: 12px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .node-label.light {
+      fill: #e9fff1;
+    }
+
+    .link.dimmed,
+    .edge-label.dimmed {
+      opacity: 0.15;
+    }
+
+    .zoom-controls {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(16, 45, 58, 0.10);
+    }
+
+    .zoom-controls button {
+      width: 34px;
+      height: 30px;
+      border: 1px solid #cbd8df;
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .zoom-controls button:hover {
+      background: #eef6f8;
+    }
+
+    @media (max-width: 980px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(520px, 1fr) 360px;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      main {
+        min-height: 620px;
+      }
+
+      #details-panel {
+        border-left: none;
+        border-top: 1px solid var(--line);
+      }
+
+      #legend {
+        width: min(310px, calc(100vw - 32px));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <h1>Thermal Management System Supply Chain</h1>
+      <div class="header-meta">
+        <span class="badge">Interactive knowledge graph</span>
+        <span class="badge">Click nodes for supply context</span>
+      </div>
+    </header>
+
+    <main>
+      <div id="graph-container"></div>
+      <div class="zoom-controls" aria-label="Zoom controls">
+        <button id="zoom-in" type="button" title="Zoom in">+</button>
+        <button id="zoom-out" type="button" title="Zoom out">-</button>
+        <button id="zoom-reset" type="button" title="Reset view">1:1</button>
+      </div>
+      <div id="legend"></div>
+      <div class="sample-data-note">Sample data created for demonstration purposes</div>
+      <div id="tooltip" class="tooltip"></div>
+    </main>
+
+    <aside id="details-panel"></aside>
+  </div>
+
+  <script>
+    /*
+      D3.js is used because this graph needs custom SVG shapes, readable fixed labels,
+      fixed-position rendering, zoom/pan, and direct control of click highlighting.
+
+      Assumptions from the image:
+      - The plant names are realistic short placeholders, not verified site claims, because the source diagram only identifies them generically.
+      - Hannon, NIDEC, Sumitomo Electric, Magnet GmbH, Unknown Supplier A, and Sumitomo Corp. are modeled as companies.
+      - The two small white boxes labelled "--" in Tier 1 and Tier 2 are intentionally omitted because they are unlabeled placeholders.
+      - Edge direction follows material or component flow toward the vehicle platform: supplier/plant -> product/component -> subsystem -> system -> platform.
+      - Coordinates are fixed so blocks remain in place and company/plant nodes stay to the right of the linked component.
+    */
+    const graphData = {
+      nodes: [
+        {
+          id: "meb_platform",
+          label: "MEB",
+          type: "system",
+          category: "OEM",
+          tier: "OEM - Platform",
+          description: "Vehicle platform shown at the top of the diagram. The thermal management system is part of this platform.",
+          metadata: {
+            roleInSupplyChain: "Final platform receiving the integrated thermal management system.",
+            examples: ["OEM platform architecture"],
+            notes: "Displayed as the OEM platform in the source graph."
+          }
+        },
+        {
+          id: "thermal_management_system",
+          label: "Thermal Management System",
+          type: "system",
+          category: "Subsystem",
+          tier: "OEM - System",
+          description: "Main system block responsible for vehicle thermal management, integrating HVAC compressor and related component chains.",
+          metadata: {
+            roleInSupplyChain: "OEM-level system integrated into the vehicle platform.",
+            examples: ["Vehicle thermal management"],
+            notes: "Wolfsburg Plant is shown as producing this system."
+          }
+        },
+        {
+          id: "plant_a",
+          label: "Wolfsburg Plant",
+          type: "plant",
+          category: "Plant",
+          tier: "OEM - System",
+          description: "Manufacturing plant shown as producing the thermal management system.",
+          metadata: {
+            roleInSupplyChain: "Production site for the top-level thermal management system.",
+            examples: ["System assembly plant"],
+            notes: "Company ownership is not specified in the diagram."
+          }
+        },
+        {
+          id: "hvac_compressor",
+          label: "HVAC Compressor (HVAC-CMP-4711)",
+          type: "product",
+          category: "Tier1",
+          tier: "Tier 1",
+          description: "Tier 1 HVAC compressor component that belongs to the thermal management system.",
+          metadata: {
+            roleInSupplyChain: "Key supplied component for refrigerant compression in the vehicle thermal management system.",
+            examples: ["HVAC compressor", "Electric compressor"],
+            notes: "Supplier Hannon and Palmela Plant (Portugal) are shown next to this component."
+          }
+        },
+        {
+          id: "hannon",
+          label: "Hannon",
+          type: "company",
+          category: "Company",
+          tier: "Tier 1",
+          description: "Tier 1 supplier shown as supplying the HVAC compressor.",
+          metadata: {
+            roleInSupplyChain: "Supplier of the HVAC compressor to the thermal management system chain.",
+            examples: ["Tier 1 compressor supplier"],
+            notes: "Name appears as 'Hannon' in the source image."
+          }
+        },
+        {
+          id: "plant_b",
+          label: "Palmela Plant (Portugal)",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 1",
+          description: "Manufacturing plant shown as producing the CO2 compressor.",
+          metadata: {
+            roleInSupplyChain: "Production site for the CO2 compressor.",
+            examples: ["CO2 compressor assembly plant"],
+            notes: "The diagram does not explicitly connect Palmela Plant (Portugal) to Hannon."
+          }
+        },
+        {
+          id: "electric_motor",
+          label: "Electric Motor",
+          type: "product",
+          category: "Tier2",
+          tier: "Tier 2",
+          description: "Tier 2 electric motor that belongs to the HVAC compressor assembly.",
+          metadata: {
+            roleInSupplyChain: "Subcomponent used by the HVAC compressor.",
+            examples: ["Compressor drive motor"],
+            notes: "Supplied by NIDEC and produced at Kyoto Plant according to the diagram."
+          }
+        },
+        {
+          id: "nidec",
+          label: "NIDEC",
+          type: "company",
+          category: "Company",
+          tier: "Tier 2",
+          description: "Tier 2 supplier shown as supplying the electric motor.",
+          metadata: {
+            roleInSupplyChain: "Supplier of the electric motor used in the compressor.",
+            examples: ["Electric motor supplier"],
+            notes: "Displayed in the Tier 2 supplier lane."
+          }
+        },
+        {
+          id: "plant_c",
+          label: "Kyoto Plant",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 2",
+          description: "Manufacturing plant shown as producing the electric motor.",
+          metadata: {
+            roleInSupplyChain: "Production site for the electric motor.",
+            examples: ["Motor production plant"],
+            notes: "The diagram does not explicitly connect Kyoto Plant to NIDEC."
+          }
+        },
+        {
+          id: "winding_wires",
+          label: "Winding Wires",
+          type: "product",
+          category: "Tier3",
+          tier: "Tier 3",
+          description: "Tier 3 component used in the electric motor.",
+          metadata: {
+            roleInSupplyChain: "Subcomponent of the electric motor, likely forming motor windings.",
+            examples: ["Copper winding wire"],
+            notes: "Contains copper and is supplied by Sumitomo Electric."
+          }
+        },
+        {
+          id: "wickel_gmbh",
+          label: "Sumitomo Electric",
+          type: "company",
+          category: "Company",
+          tier: "Tier 3",
+          description: "Tier 3 supplier shown as supplying winding wires.",
+          metadata: {
+            roleInSupplyChain: "Supplier of winding wires used in the electric motor.",
+            examples: ["Wire supplier"],
+            notes: "Displayed on the right side of the winding wire node."
+          }
+        },
+        {
+          id: "plant_d",
+          label: "Aachen Plant",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 3",
+          description: "Manufacturing plant shown as producing winding wires.",
+          metadata: {
+            roleInSupplyChain: "Production site for winding wires.",
+            examples: ["Wire production plant"],
+            notes: "The diagram does not explicitly connect Aachen Plant to Sumitomo Electric."
+          }
+        },
+        {
+          id: "magnet_set",
+          label: "Magnet Set",
+          type: "product",
+          category: "Tier3",
+          tier: "Tier 3",
+          description: "Tier 3 magnet set used in the electric motor.",
+          metadata: {
+            roleInSupplyChain: "Subcomponent of the electric motor, likely part of rotor or stator magnetic assembly.",
+            examples: ["Permanent magnet set"],
+            notes: "Contains magnet material and is supplied by Magnet GmbH."
+          }
+        },
+        {
+          id: "magnet_gmbh",
+          label: "Magnet GmbH",
+          type: "company",
+          category: "Company",
+          tier: "Tier 3",
+          description: "Tier 3 supplier shown as supplying the magnet set.",
+          metadata: {
+            roleInSupplyChain: "Supplier of the magnet set used in the electric motor.",
+            examples: ["Magnet assembly supplier"],
+            notes: "Displayed on the right side of the magnet set node."
+          }
+        },
+        {
+          id: "plant_e",
+          label: "Hanau Plant",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier 3",
+          description: "Manufacturing plant shown as producing the magnet set.",
+          metadata: {
+            roleInSupplyChain: "Production site for the magnet set.",
+            examples: ["Magnet set production plant"],
+            notes: "The diagram does not explicitly connect Hanau Plant to Magnet GmbH."
+          }
+        },
+        {
+          id: "copper",
+          label: "Copper",
+          type: "material",
+          category: "RawMaterial",
+          tier: "Tier n",
+          description: "Raw material shown as contained in winding wires.",
+          metadata: {
+            roleInSupplyChain: "Base material for winding wires.",
+            examples: ["Copper conductor material"],
+            notes: "The source image labels the relation to winding wires as 'contains'."
+          }
+        },
+        {
+          id: "unknown_supplier_b",
+          label: "Sumitomo Corp.",
+          type: "company",
+          category: "Company",
+          tier: "Tier n",
+          description: "Supplier shown as supplying copper.",
+          metadata: {
+            roleInSupplyChain: "Upstream supplier of copper material.",
+            examples: ["Raw material supplier"],
+            notes: "Displayed next to the copper node."
+          }
+        },
+        {
+          id: "japan_refinery",
+          label: "Japan Refinery",
+          type: "plant",
+          category: "Plant",
+          tier: "Tier n",
+          description: "Refinery shown as producing copper.",
+          metadata: {
+            roleInSupplyChain: "Production site for copper material.",
+            examples: ["Copper refinery"],
+            notes: "Displayed next to the copper node."
+          }
+        },
+        {
+          id: "magnet_material",
+          label: "Magnet Material",
+          type: "material",
+          category: "RawMaterial",
+          tier: "Tier n",
+          description: "Raw or base material shown as contained in the magnet set.",
+          metadata: {
+            roleInSupplyChain: "Base material for the magnet set.",
+            examples: ["Permanent magnet material"],
+            notes: "Specific chemistry is not identified in the diagram."
+          }
+        },
+        {
+          id: "unknown_supplier_a",
+          label: "Unknown Supplier A",
+          type: "company",
+          category: "Company",
+          tier: "Tier n",
+          description: "Unidentified supplier shown as supplying magnet material.",
+          metadata: {
+            roleInSupplyChain: "Upstream supplier of magnet material.",
+            examples: ["Raw material supplier"],
+            notes: "Supplier name is unknown in the source diagram."
+          }
+        }
+      ],
+      links: [
+        {
+          source: "thermal_management_system",
+          target: "meb_platform",
+          relation: "belongs_to",
+          description: "The thermal management system is part of the MEB platform."
+        },
+        {
+          source: "plant_a",
+          target: "thermal_management_system",
+          relation: "produces",
+          description: "Wolfsburg Plant produces the thermal management system."
+        },
+        {
+          source: "hvac_compressor",
+          target: "thermal_management_system",
+          relation: "belongs_to",
+          description: "The HVAC compressor is part of the thermal management system."
+        },
+        {
+          source: "hannon",
+          target: "hvac_compressor",
+          relation: "supplies",
+          description: "Hannon supplies the HVAC compressor."
+        },
+        {
+          source: "plant_b",
+          target: "hvac_compressor",
+          relation: "produces",
+          description: "Palmela Plant (Portugal) produces the CO2 compressor."
+        },
+        {
+          source: "electric_motor",
+          target: "hvac_compressor",
+          relation: "belongs_to",
+          description: "The electric motor is part of the HVAC compressor."
+        },
+        {
+          source: "nidec",
+          target: "electric_motor",
+          relation: "supplies",
+          description: "NIDEC supplies the electric motor."
+        },
+        {
+          source: "plant_c",
+          target: "electric_motor",
+          relation: "produces",
+          description: "Kyoto Plant produces the electric motor."
+        },
+        {
+          source: "winding_wires",
+          target: "electric_motor",
+          relation: "belongs_to",
+          description: "Winding wires are part of the electric motor."
+        },
+        {
+          source: "magnet_set",
+          target: "electric_motor",
+          relation: "belongs_to",
+          description: "The magnet set is part of the electric motor."
+        },
+        {
+          source: "wickel_gmbh",
+          target: "winding_wires",
+          relation: "supplies",
+          description: "Sumitomo Electric supplies winding wires."
+        },
+        {
+          source: "plant_d",
+          target: "winding_wires",
+          relation: "produces",
+          description: "Aachen Plant produces winding wires."
+        },
+        {
+          source: "magnet_gmbh",
+          target: "magnet_set",
+          relation: "supplies",
+          description: "Magnet GmbH supplies the magnet set."
+        },
+        {
+          source: "plant_e",
+          target: "magnet_set",
+          relation: "produces",
+          description: "Hanau Plant produces the magnet set."
+        },
+        {
+          source: "copper",
+          target: "winding_wires",
+          relation: "belongs_to",
+          description: "Copper is contained in the winding wires."
+        },
+        {
+          source: "unknown_supplier_b",
+          target: "copper",
+          relation: "supplies",
+          description: "Sumitomo Corp. supplies copper."
+        },
+        {
+          source: "japan_refinery",
+          target: "copper",
+          relation: "produces",
+          description: "Japan Refinery produces copper."
+        },
+        {
+          source: "magnet_material",
+          target: "magnet_set",
+          relation: "belongs_to",
+          description: "Magnet material is contained in the magnet set."
+        },
+        {
+          source: "unknown_supplier_a",
+          target: "magnet_material",
+          relation: "supplies",
+          description: "Unknown Supplier A supplies magnet material."
+        }
+      ]
+    };
+
+    const categoryStyles = {
+      OEM: { color: "#dfe5e8", text: "#073945", shape: "rect", width: 160, height: 44 },
+      Subsystem: { color: "#064f5a", text: "#e9fff1", shape: "roundRect", width: 162, height: 86 },
+      Tier1: { color: "#009a8a", text: "#e9fff1", shape: "roundRect", width: 168, height: 84 },
+      Tier2: { color: "#4ab995", text: "#073945", shape: "roundRect", width: 150, height: 82 },
+      Tier3: { color: "#92dfac", text: "#073945", shape: "roundRect", width: 150, height: 84 },
+      RawMaterial: { color: "#d7dadd", text: "#073945", shape: "rect", width: 150, height: 78 },
+      Company: { color: "#ffffff", text: "#073945", shape: "supplier", width: 128, height: 34 },
+      Plant: { color: "#d8f2f8", text: "#073945", shape: "supplier", width: 116, height: 32 },
+      Other: { color: "#ffffff", text: "#073945", shape: "pill", width: 116, height: 32 }
+    };
+
+    const magnetMaterialWarning = {
+      id: "magnet_material_export_control_warning",
+      nodeId: "magnet_material",
+      title: "Magnet Material Supply Risk",
+      summary: "The supply of magnet materials may be at risk because China is setting export controls on rare-earth-related items for other countries.",
+      affectedNodeIds: [
+        "magnet_material",
+        "magnet_set",
+        "electric_motor",
+        "hvac_compressor",
+        "thermal_management_system",
+        "meb_platform"
+      ],
+      sources: [
+        {
+          region: "China",
+          sourceType: "Government / official regulation",
+          label: "MOFCOM Notice 2025 No. 61",
+          url: "https://www.mofcom.gov.cn/zwgk/zcfb/art/2025/art_7fc9bff0fb4546ecb02f66ee77d0e5f6.html"
+        },
+        {
+          region: "Western",
+          sourceType: "Policy research / official translation",
+          label: "CSET English translation and analysis",
+          url: "https://cset.georgetown.edu/wp-content/uploads/t0656_china_rare_earth_controls_2025_61_EN.pdf"
+        },
+        {
+          region: "Western",
+          sourceType: "News agency",
+          label: "Reuters report on tighter rare-earth magnet export license scrutiny",
+          url: "https://www.reuters.com/world/china/china-is-making-it-harder-get-rare-earth-magnet-export-licenses-sources-say-2025-10-14/"
+        }
+      ]
+    };
+
+    const tierY = {
+      "OEM - Platform": 46,
+      "OEM - System": 146,
+      "Tier 1": 280,
+      "Tier 2": 430,
+      "Tier 3": 590,
+      "Tier n": 750
+    };
+
+    const tierLabels = [
+      ["OEM - Platform", 46],
+      ["OEM - System", 146],
+      ["Tier 1", 280],
+      ["Tier 2", 430],
+      ["Tier 3", 590],
+      ["Tier n", 750]
+    ];
+
+    const fixedPositions = {
+      meb_platform: { x: 530, y: 46 },
+      thermal_management_system: { x: 530, y: 146 },
+      plant_a: { x: 790, y: 132 },
+      hvac_compressor: { x: 530, y: 280 },
+      hannon: { x: 790, y: 260 },
+      plant_b: { x: 790, y: 300 },
+      electric_motor: { x: 530, y: 430 },
+      nidec: { x: 790, y: 410 },
+      plant_c: { x: 790, y: 450 },
+      winding_wires: { x: 230, y: 590 },
+      wickel_gmbh: { x: 480, y: 568 },
+      plant_d: { x: 480, y: 610 },
+      magnet_set: { x: 660, y: 590 },
+      magnet_gmbh: { x: 925, y: 568 },
+      plant_e: { x: 925, y: 610 },
+      copper: { x: 230, y: 750 },
+      unknown_supplier_b: { x: 480, y: 730 },
+      japan_refinery: { x: 480, y: 770 },
+      magnet_material: { x: 660, y: 750 },
+      unknown_supplier_a: { x: 925, y: 750 }
+    };
+
+    const container = document.getElementById("graph-container");
+    const detailsPanel = document.getElementById("details-panel");
+    const legend = document.getElementById("legend");
+    const tooltip = document.getElementById("tooltip");
+    const width = Math.max(container.clientWidth, 980);
+    const height = Math.max(container.clientHeight, 820);
+
+    const nodes = graphData.nodes.map((node) => ({ ...node }));
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const links = graphData.links.map((link) => ({
+      ...link,
+      source: nodeById.get(link.source),
+      target: nodeById.get(link.target)
+    }));
+
+    const svg = d3.select("#graph-container")
+      .append("svg")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("role", "img")
+      .attr("aria-label", "Interactive supply chain knowledge graph for a car platform thermal management system");
+
+    svg.append("defs").html(`
+      <marker id="arrow-supply" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,-5L10,0L0,5" fill="#56707c"></path>
+      </marker>
+      <marker id="arrow-part" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,-5L10,0L0,5" fill="#007c89"></path>
+      </marker>
+      <marker id="arrow-highlight" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M0,-5L10,0L0,5" fill="#ffb000"></path>
+      </marker>
+    `);
+
+    const zoomLayer = svg.append("g");
+    const tierLayer = zoomLayer.append("g").attr("class", "tiers");
+    const linkLayer = zoomLayer.append("g").attr("class", "links");
+    const labelLayer = zoomLayer.append("g").attr("class", "edge-labels");
+    const nodeLayer = zoomLayer.append("g").attr("class", "nodes");
+
+    tierLayer.append("rect")
+      .attr("class", "tier-band")
+      .attr("x", 0)
+      .attr("y", tierY["Tier n"] - 58)
+      .attr("width", width)
+      .attr("height", 132);
+
+    tierLayer.selectAll("line")
+      .data(tierLabels)
+      .join("line")
+      .attr("class", "tier-rule")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", (d) => d[1] + 64)
+      .attr("y2", (d) => d[1] + 64);
+
+    tierLayer.selectAll("text")
+      .data(tierLabels)
+      .join("text")
+      .attr("class", "tier-label")
+      .attr("x", 22)
+      .attr("y", (d) => d[1] + 8)
+      .text((d) => d[0]);
+
+    const link = linkLayer.selectAll("path")
+      .data(links)
+      .join("path")
+      .attr("class", (d) => `link ${d.relation}`)
+      .attr("marker-end", (d) => d.relation === "belongs_to" ? "url(#arrow-part)" : "url(#arrow-supply)");
+
+    const edgeLabel = labelLayer.selectAll("text")
+      .data(links)
+      .join("text")
+      .attr("class", "edge-label")
+      .text((d) => `<${d.relation}>`);
+
+    const node = nodeLayer.selectAll("g")
+      .data(nodes)
+      .join("g")
+      .attr("class", "node")
+      .on("mouseenter", showTooltip)
+      .on("mousemove", moveTooltip)
+      .on("mouseleave", hideTooltip)
+      .on("click", (event, d) => {
+        event.stopPropagation();
+        selectNode(d.id);
+      });
+
+    node.each(function(d) {
+      const style = categoryStyles[d.styleCategory || d.category] || categoryStyles.Other;
+      d.nodeWidth = style.width;
+      d.nodeHeight = style.height;
+      const group = d3.select(this);
+
+      if (style.shape === "pill" || style.shape === "supplier") {
+        group.append("rect")
+          .attr("class", "node-shape")
+          .attr("x", -style.width / 2)
+          .attr("y", -style.height / 2)
+          .attr("width", style.width)
+          .attr("height", style.height)
+          .attr("rx", style.shape === "supplier" ? 4 : style.height / 2)
+          .attr("fill", style.color);
+      } else {
+        group.append("rect")
+          .attr("class", "node-shape")
+          .attr("x", -style.width / 2)
+          .attr("y", -style.height / 2)
+          .attr("width", style.width)
+          .attr("height", style.height)
+          .attr("rx", style.shape === "roundRect" ? 12 : 6)
+          .attr("fill", style.color);
+      }
+
+      const lines = wrapLabel(d.label, style.width - 18);
+      const lineHeight = 14;
+      group.selectAll("text")
+        .data(lines)
+        .join("text")
+        .attr("class", `node-label ${style.text === "#e9fff1" ? "light" : ""}`)
+        .attr("y", (_, i) => (i - (lines.length - 1) / 2) * lineHeight)
+        .text((line) => line);
+
+      if (d.id === magnetMaterialWarning.nodeId) {
+        const warning = group.append("g")
+          .attr("class", "warning-icon")
+          .attr("transform", `translate(${style.width / 2 - 8},${-style.height / 2 + 8})`)
+          .attr("role", "button")
+          .attr("aria-label", "Show magnet material supply warning")
+          .on("mouseenter", (event) => {
+            event.stopPropagation();
+            tooltip.innerHTML = `<strong>${escapeHtml(magnetMaterialWarning.title)}</strong><br>Click to show affected chain`;
+            tooltip.style.opacity = "1";
+            moveTooltip(event);
+          })
+          .on("mousemove", (event) => {
+            event.stopPropagation();
+            moveTooltip(event);
+          })
+          .on("mouseleave", (event) => {
+            event.stopPropagation();
+            hideTooltip();
+          })
+          .on("click", (event) => {
+            event.stopPropagation();
+            selectWarning(magnetMaterialWarning.id);
+          });
+
+        warning.append("circle")
+          .attr("r", 13);
+
+        warning.append("text")
+          .attr("y", 1)
+          .text("!");
+      }
+    });
+
+    nodes.forEach((node) => {
+      const position = fixedPositions[node.id] || { x: width / 2, y: tierY[node.tier] || height / 2 };
+      node.x = position.x;
+      node.y = position.y;
+    });
+
+    const zoom = d3.zoom()
+      .scaleExtent([0.45, 2.6])
+      .on("zoom", (event) => {
+        zoomLayer.attr("transform", event.transform);
+      });
+
+    svg.call(zoom).on("click", () => selectNode(null));
+
+    const initialTransform = d3.zoomIdentity.translate(8, 8).scale(Math.min(width / 1120, 1));
+    svg.call(zoom.transform, initialTransform);
+
+    document.getElementById("zoom-in").addEventListener("click", () => svg.transition().duration(180).call(zoom.scaleBy, 1.22));
+    document.getElementById("zoom-out").addEventListener("click", () => svg.transition().duration(180).call(zoom.scaleBy, 0.82));
+    document.getElementById("zoom-reset").addEventListener("click", () => svg.transition().duration(220).call(zoom.transform, initialTransform));
+
+    renderStaticGraph();
+    renderLegend();
+    renderDetails(null);
+
+    function renderStaticGraph() {
+      link.attr("d", (d) => {
+        const source = trimPoint(d.source, d.target);
+        const target = trimPoint(d.target, d.source);
+        const mx = (source.x + target.x) / 2;
+        const my = (source.y + target.y) / 2;
+        const curve = d.relation === "belongs_to" ? 0 : 18;
+        return `M${source.x},${source.y} Q${mx},${my - curve} ${target.x},${target.y}`;
+      });
+
+      edgeLabel
+        .attr("x", (d) => (d.source.x + d.target.x) / 2)
+        .attr("y", (d) => (d.source.y + d.target.y) / 2 - 8);
+
+      node.attr("transform", (d) => `translate(${d.x},${d.y})`);
+    }
+
+    function trimPoint(from, to) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.sqrt(dx * dx + dy * dy) || 1;
+      const padX = (from.nodeWidth || 120) / 2 + 8;
+      const padY = (from.nodeHeight || 60) / 2 + 8;
+      const scale = Math.min(Math.abs(dx) > 0 ? padX / Math.abs(dx) : Infinity, Math.abs(dy) > 0 ? padY / Math.abs(dy) : Infinity);
+      const pad = Math.min(scale * length, Math.max(padX, padY));
+      return {
+        x: from.x + dx / length * pad,
+        y: from.y + dy / length * pad
+      };
+    }
+
+    function wrapLabel(text, maxWidth) {
+      if (text === "--") return ["--"];
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = "";
+      const approxCharWidth = 6.7;
+
+      words.forEach((word) => {
+        const test = line ? `${line} ${word}` : word;
+        if (test.length * approxCharWidth > maxWidth && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      });
+      if (line) lines.push(line);
+      return lines.length ? lines : [text];
+    }
+
+    function showTooltip(event, d) {
+      tooltip.innerHTML = `<strong>${escapeHtml(d.label)}</strong><br>${escapeHtml(d.type)} | ${escapeHtml(d.category)}`;
+      tooltip.style.opacity = "1";
+      moveTooltip(event);
+    }
+
+    function moveTooltip(event) {
+      const rect = container.getBoundingClientRect();
+      tooltip.style.left = `${event.clientX - rect.left}px`;
+      tooltip.style.top = `${event.clientY - rect.top}px`;
+    }
+
+    function hideTooltip() {
+      tooltip.style.opacity = "0";
+    }
+
+    function selectNode(id) {
+      const selected = id ? nodeById.get(id) : null;
+      const neighborIds = new Set();
+      if (selected) {
+        links.forEach((linkDatum) => {
+          const sourceId = typeof linkDatum.source === "object" ? linkDatum.source.id : linkDatum.source;
+          const targetId = typeof linkDatum.target === "object" ? linkDatum.target.id : linkDatum.target;
+          if (sourceId === id) neighborIds.add(targetId);
+          if (targetId === id) neighborIds.add(sourceId);
+        });
+      }
+
+      node
+        .classed("selected", (d) => selected && d.id === selected.id)
+        .classed("neighbor", (d) => selected && neighborIds.has(d.id))
+        .classed("dimmed", (d) => selected && d.id !== selected.id && !neighborIds.has(d.id));
+
+      link
+        .classed("highlighted", (d) => selected && (d.source.id === selected.id || d.target.id === selected.id))
+        .classed("dimmed", (d) => selected && d.source.id !== selected.id && d.target.id !== selected.id)
+        .attr("marker-end", (d) => {
+          if (selected && (d.source.id === selected.id || d.target.id === selected.id)) return "url(#arrow-highlight)";
+          return d.relation === "belongs_to" ? "url(#arrow-part)" : "url(#arrow-supply)";
+        });
+
+      edgeLabel.classed("dimmed", (d) => selected && d.source.id !== selected.id && d.target.id !== selected.id);
+      renderDetails(selected);
+    }
+
+    function selectWarning(id) {
+      if (id !== magnetMaterialWarning.id) return;
+      const affected = new Set(magnetMaterialWarning.affectedNodeIds);
+
+      node
+        .classed("selected", false)
+        .classed("neighbor", false)
+        .classed("risk-affected", (d) => affected.has(d.id) && d.type !== "company" && d.type !== "plant")
+        .classed("dimmed", (d) => !affected.has(d.id));
+
+      link
+        .classed("highlighted", (d) => affected.has(d.source.id) && affected.has(d.target.id))
+        .classed("dimmed", (d) => !(affected.has(d.source.id) && affected.has(d.target.id)))
+        .attr("marker-end", (d) => {
+          if (affected.has(d.source.id) && affected.has(d.target.id)) return "url(#arrow-highlight)";
+          return d.relation === "belongs_to" ? "url(#arrow-part)" : "url(#arrow-supply)";
+        });
+
+      edgeLabel.classed("dimmed", (d) => !(affected.has(d.source.id) && affected.has(d.target.id)));
+      renderWarningDetails();
+    }
+
+    function renderDetails(selected) {
+      node.classed("risk-affected", false);
+
+      if (!selected) {
+        detailsPanel.innerHTML = `
+          <p class="panel-kicker">Selection</p>
+          <h2 class="panel-title">Supply Chain Overview</h2>
+          <div class="panel-subtitle">
+            <span class="tag">${graphData.nodes.length} nodes</span>
+            <span class="tag">${graphData.links.length} relationships</span>
+          </div>
+          <div class="detail-section">
+            <h3>Graph Context</h3>
+            <p>This graph models the thermal management system supply chain from raw materials through component tiers into the OEM vehicle platform. Select any company, component, material, plant, or system node to inspect direct upstream suppliers and downstream customers.</p>
+          </div>
+          <div class="detail-section">
+            <h3>Main Flow</h3>
+            <p>Sumitomo Corp. and Japan Refinery feed copper, while the remaining unknown raw material supplier feeds magnet material. These materials feed winding wires and magnet sets, which feed the electric motor, which feeds the HVAC compressor, which belongs to the thermal management system on the MEB platform.</p>
+          </div>
+          <div class="hint">Mouse wheel or trackpad zooms. Drag the canvas to pan. Node positions are fixed.</div>
+        `;
+        return;
+      }
+
+      const incoming = links
+        .filter((linkDatum) => linkDatum.target.id === selected.id)
+        .map((linkDatum) => ({ node: linkDatum.source, link: linkDatum }));
+      const outgoing = links
+        .filter((linkDatum) => linkDatum.source.id === selected.id)
+        .map((linkDatum) => ({ node: linkDatum.target, link: linkDatum }));
+
+      detailsPanel.innerHTML = `
+        <p class="panel-kicker">${escapeHtml(selected.tier)}</p>
+        <h2 class="panel-title">${escapeHtml(selected.label)}</h2>
+        <div class="panel-subtitle">
+          <span class="tag">${escapeHtml(selected.type)}</span>
+          <span class="tag">${escapeHtml(selected.category)}</span>
+        </div>
+        <div class="detail-section">
+          <h3>Description</h3>
+          <p>${escapeHtml(selected.description)}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Role In Supply Chain</h3>
+          <p>${escapeHtml(selected.metadata.roleInSupplyChain)}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Upstream Suppliers</h3>
+          ${renderNeighborList(incoming, "No direct upstream supplier shown.")}
+        </div>
+        <div class="detail-section">
+          <h3>Downstream Customers</h3>
+          ${renderNeighborList(outgoing, "No direct downstream customer shown.")}
+        </div>
+        <div class="detail-section">
+          <h3>Notes</h3>
+          <p>${escapeHtml(selected.metadata.notes)}</p>
+        </div>
+      `;
+    }
+
+    function renderWarningDetails() {
+      const affectedNames = magnetMaterialWarning.affectedNodeIds
+        .map((id) => nodeById.get(id))
+        .filter((item) => item && item.type !== "company" && item.type !== "plant")
+        .map((item) => item.label);
+
+      detailsPanel.innerHTML = `
+        <p class="panel-kicker">Warning</p>
+        <h2 class="panel-title">${escapeHtml(magnetMaterialWarning.title)}</h2>
+        <div class="panel-subtitle">
+          <span class="tag">Supply risk</span>
+          <span class="tag">Magnet material</span>
+        </div>
+        <div class="detail-section">
+          <h3>Risk Explanation</h3>
+          <p>${escapeHtml(magnetMaterialWarning.summary)}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Affected Chain</h3>
+          <p>${escapeHtml(affectedNames.join(" -> "))}</p>
+        </div>
+        <div class="detail-section">
+          <h3>Relevant Data Input</h3>
+          <ul class="source-list">
+            ${magnetMaterialWarning.sources.map((source) => `
+              <li>
+                <div class="source-meta">
+                  <span class="source-pill">${escapeHtml(source.region)}</span>
+                  <span class="source-pill">${escapeHtml(source.sourceType)}</span>
+                </div>
+                <a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label)}</a>
+                <div class="source-url">${escapeHtml(source.url)}</div>
+              </li>
+            `).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    function renderNeighborList(items, emptyText) {
+      if (!items.length) return `<p>${emptyText}</p>`;
+      return `
+        <ul class="neighbor-list">
+          ${items.map((item) => `
+            <li>
+              <span>${escapeHtml(item.node.label)}</span>
+              <span>${escapeHtml(item.link.relation)}</span>
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+
+    function renderLegend() {
+      const categoryItems = [
+        ["OEM", "OEM / Platform"],
+        ["Subsystem", "System block"],
+        ["Tier1", "Tier 1 component"],
+        ["Tier2", "Tier 2 component"],
+        ["Tier3", "Tier 3 component"],
+        ["RawMaterial", "Tier n material"],
+        ["Company", "Company"],
+        ["Plant", "Plant"]
+      ];
+
+      legend.innerHTML = `
+        <p class="legend-title">Legend</p>
+        <div class="legend-grid">
+          ${categoryItems.map(([key, label]) => `
+            <div class="legend-item">
+              <span class="swatch" style="background:${categoryStyles[key].color}"></span>
+              <span>${label}</span>
+            </div>
+          `).join("")}
+          <div class="legend-item">
+            <span class="edge-sample dashed"></span>
+            <span>supplies / produces</span>
+          </div>
+          <div class="legend-item">
+            <span class="edge-sample part"></span>
+            <span>belongs_to</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
