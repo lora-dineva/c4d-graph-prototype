@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, initial-scale=1">
+<title>N-tier Supplier Monitor — Graph Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+<script src="graph-explorer-data.js"></script>
+<script src="graph-explorer-mock-api.js"></script>
+<style>
+:root {
+  /* Light surfaces */
+  --canvas: #eef2f7;
+  --surface: #ffffff;
+  --surface-alt: #f5f8fc;
+  --panel-bg: #ffffff;
+  --panel-border: #dce4ee;
+  --hairline: #e6ecf4;
+  /* VW brand accents */
+  --brand-dark: #001e50;
+  --brand-teal: #00b0f0;
+  --brand-teal-ink: #006a93;
+  /* Text */
+  --text-primary: #14233b;
+  --text-secondary: #5a6b80;
+  --text-muted: #8a99ac;
+  --panel-width: 380px;
+  --filter-width: 264px;
+  /* Structural risk palette (temperature shift) */
+  --risk-critical: #FF4500;
+  --risk-high: #FF8C00;
+  --risk-medium: #E0A100;
+  --risk-low: #2393c9;
+  --risk-none: #9aa7b8;
+  /* Live alert palette */
+  --alert-critical: #E53935;
+  --alert-high: #FB8C00;
+  --alert-medium: #E0A100;
+  --alert-info: #00B0F0;
+  --healthy: #1e9e57;
+  --shadow: 0 6px 24px rgba(0,30,80,.12);
+  --shadow-sm: 0 2px 8px rgba(0,30,80,.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; font-family: 'VW Text', Inter, -apple-system, sans-serif; background: var(--canvas); color: var(--text-primary); }
+button { font-family: inherit; }
+
+#app { display: grid; grid-template-rows: 48px 1fr; height: 100vh; }
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+#toolbar {
+  background: var(--brand-dark); color: #fff;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px; z-index: 200;
+}
+#toolbar h1 { font-size: 13px; font-weight: 600; letter-spacing: .4px; white-space: nowrap; }
+.badge { font-size: 10px; background: rgba(0,176,240,.25); color: #aee6ff; padding: 2px 8px; border-radius: 3px; }
+.toolbar-spacer { flex: 1; }
+#search-wrap { position: relative; width: 260px; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.55); font-size: 12px; pointer-events: none; }
+#search {
+  width: 100%; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  border-radius: 6px; padding: 7px 12px 7px 28px; color: #fff; font-size: 12px;
+}
+#search::placeholder { color: rgba(255,255,255,.55); }
+#search:focus { outline: none; border-color: var(--brand-teal); background: rgba(255,255,255,.18); }
+#search-results {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--panel-border); border-radius: 8px;
+  box-shadow: var(--shadow); max-height: 320px; overflow-y: auto; display: none; z-index: 500;
+}
+#search-results.open { display: block; }
+.sr-group { font-size: 9px; text-transform: uppercase; letter-spacing: .8px; color: var(--text-muted); padding: 8px 12px 4px; }
+.sr-item { padding: 8px 12px; cursor: pointer; font-size: 12px; border-left: 3px solid transparent; color: var(--text-primary); }
+.sr-item:hover, .sr-item.active { background: var(--surface-alt); border-left-color: var(--brand-teal); }
+.sr-meta { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+
+.tbtn {
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+  color: #fff; padding: 6px 11px; border-radius: 6px; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.tbtn:hover { background: rgba(255,255,255,.2); }
+.tbtn.active { background: var(--brand-teal); border-color: var(--brand-teal); color: var(--brand-dark); font-weight: 600; }
+.tbtn-icon { position: relative; padding: 6px 9px; }
+.alert-badge {
+  position: absolute; top: -5px; right: -5px; background: var(--alert-critical);
+  color: #fff; font-size: 9px; min-width: 16px; height: 16px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; padding: 0 3px;
+}
+.seg { display: inline-flex; background: rgba(255,255,255,.1); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); }
+.seg button { background: transparent; border: none; color: #fff; padding: 6px 10px; font-size: 11px; cursor: pointer; }
+.seg button.active { background: var(--brand-teal); color: var(--brand-dark); font-weight: 600; }
+
+.menu-wrap { position: relative; }
+.menu-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 248px; max-width: 320px;
+  max-height: min(72vh, 460px); overflow-y: auto;
+  background: var(--surface); color: var(--text-primary); border: 1px solid var(--panel-border);
+  border-radius: 8px; box-shadow: var(--shadow); padding: 6px; display: none; z-index: 450;
+}
+.menu-pop.open { display: block; }
+.menu-pop .mi { padding: 8px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.menu-pop .mi:hover { background: var(--surface-alt); }
+.menu-pop .mi .mi-name { display: block; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+.menu-pop .mi small { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
+.menu-pop .menu-label { font-size: 9px; text-transform: uppercase; letter-spacing: .7px; color: var(--text-muted); padding: 7px 10px 3px; }
+.menu-sep { height: 1px; background: var(--hairline); margin: 5px 2px; }
+
+/* ── Main layout ─────────────────────────────────────────── */
+#main { display: flex; min-height: 0; position: relative; }
+#canvas-wrap { flex: 1; position: relative; min-width: 0; }
+#cy { width: 100%; height: 100%; background:
+  radial-gradient(circle at 30% 20%, #f4f8fc, var(--canvas)); }
+
+/* Filters panel (left, collapsible) */
+#filter-panel {
+  width: var(--filter-width); background: var(--panel-bg); border-right: 1px solid var(--panel-border);
+  display: flex; flex-direction: column; z-index: 160; transition: margin-left .2s ease;
+}
+#filter-panel.collapsed { margin-left: calc(-1 * var(--filter-width)); }
+#filter-head { padding: 12px 14px; border-bottom: 1px solid var(--hairline); display: flex; justify-content: space-between; align-items: center; }
+#filter-head strong { font-size: 12px; }
+#filter-body { flex: 1; overflow-y: auto; padding: 6px 14px 14px; }
+.acc { border-bottom: 1px solid var(--hairline); }
+.acc-head { padding: 10px 0; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: var(--text-primary); }
+.acc-head .chev { color: var(--text-muted); transition: transform .15s; }
+.acc.open .chev { transform: rotate(90deg); }
+.acc-body { display: none; padding-bottom: 12px; }
+.acc.open .acc-body { display: block; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.fchip {
+  font-size: 10px; padding: 4px 9px; border-radius: 12px; cursor: pointer;
+  background: var(--surface-alt); border: 1px solid var(--panel-border); color: var(--text-secondary);
+}
+.fchip.on { background: var(--brand-teal); border-color: var(--brand-teal); color: var(--brand-dark); font-weight: 600; }
+.fchk { display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 4px 0; color: var(--text-secondary); cursor: pointer; }
+.fchk input { accent-color: var(--brand-teal); }
+.layer-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 11px; }
+.switch { position: relative; width: 34px; height: 18px; background: #cdd8e6; border-radius: 10px; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+.switch.on { background: var(--brand-teal); }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: left .15s; }
+.switch.on::after { left: 18px; }
+
+#filter-toggle-tab {
+  position: absolute; left: 0; top: 16px; z-index: 150;
+  background: var(--surface); border: 1px solid var(--panel-border); border-left: none;
+  border-radius: 0 8px 8px 0; padding: 8px 8px; cursor: pointer; box-shadow: var(--shadow-sm);
+  font-size: 11px; color: var(--text-primary); display: none; writing-mode: vertical-rl;
+}
+#filter-panel.collapsed + #canvas-wrap #filter-toggle-tab { display: block; }
+
+/* Floating chrome */
+#scenario-bar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 120;
+  display: flex; gap: 8px;
+}
+.scenario-btn {
+  text-align: left; padding: 9px 13px; border-radius: 10px; width: 215px;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+  border: 1px solid var(--panel-border); color: var(--text-primary);
+  cursor: pointer; font-size: 11px; line-height: 1.35; box-shadow: var(--shadow-sm);
+}
+.scenario-btn:hover { border-color: var(--brand-teal); }
+.scenario-btn strong { display: block; font-size: 12px; margin-bottom: 2px; color: var(--brand-dark); }
+.scenario-btn span { color: var(--text-secondary); font-size: 10px; }
+
+#spof-banner {
+  position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%); z-index: 120; display: none;
+  background: #fff3e6; border: 1px solid var(--risk-high); color: #8a4b00;
+  border-radius: 8px; padding: 8px 12px; font-size: 11px; box-shadow: var(--shadow-sm);
+  align-items: center; gap: 10px;
+}
+#spof-banner.show { display: flex; }
+#spof-banner button { font-size: 10px; padding: 3px 8px; border: 1px solid var(--risk-high); background: #fff; border-radius: 5px; cursor: pointer; color: #8a4b00; }
+
+#active-chips { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); z-index: 110; display: flex; gap: 6px; flex-wrap: wrap; max-width: 70%; justify-content: center; }
+.active-chip { font-size: 10px; background: var(--surface); border: 1px solid var(--panel-border); border-radius: 12px; padding: 3px 10px; box-shadow: var(--shadow-sm); cursor: pointer; color: var(--text-secondary); }
+.active-chip b { color: var(--text-primary); }
+
+#legend {
+  position: absolute; bottom: 44px; left: 12px; z-index: 100;
+  background: rgba(255,255,255,.95); border: 1px solid var(--panel-border); border-radius: 8px;
+  padding: 10px 13px; font-size: 10px; color: var(--text-secondary); box-shadow: var(--shadow-sm);
+}
+#legend .title { text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; font-size: 9px; color: var(--text-muted); }
+.legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid; background: #fff; }
+
+#info-strip {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 32px;
+  background: rgba(255,255,255,.96); border-top: 1px solid var(--panel-border);
+  display: flex; align-items: center; padding: 0 16px; font-size: 11px; color: var(--text-secondary); z-index: 100;
+}
+#info-count { margin-left: auto; color: var(--text-muted); }
+
+#bottom-right { position: absolute; bottom: 44px; right: 12px; z-index: 100; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+#layout-switch { display: inline-flex; background: var(--surface); border: 1px solid var(--panel-border); border-radius: 7px; overflow: hidden; box-shadow: var(--shadow-sm); }
+#layout-switch button { background: transparent; border: none; padding: 6px 10px; font-size: 11px; cursor: pointer; color: var(--text-secondary); }
+#layout-switch button.active { background: var(--brand-teal); color: var(--brand-dark); font-weight: 600; }
+#zoom-cluster { display: flex; gap: 4px; }
+.zbtn { width: 32px; height: 30px; background: var(--surface); border: 1px solid var(--panel-border); border-radius: 6px; cursor: pointer; font-size: 14px; color: var(--text-primary); box-shadow: var(--shadow-sm); }
+.zbtn:hover { background: var(--surface-alt); }
+
+/* Node action bubble + context menu */
+#action-bubble { position: absolute; z-index: 130; display: none; gap: 4px; }
+#action-bubble.show { display: flex; }
+.ab { background: var(--brand-dark); color: #fff; border: none; border-radius: 6px; padding: 5px 9px; font-size: 10px; cursor: pointer; box-shadow: var(--shadow-sm); }
+.ab:hover { background: var(--brand-teal); color: var(--brand-dark); }
+#ctx-menu { position: absolute; z-index: 470; background: var(--surface); border: 1px solid var(--panel-border); border-radius: 8px; box-shadow: var(--shadow); padding: 5px; display: none; min-width: 190px; }
+#ctx-menu.show { display: block; }
+#ctx-menu .mi { padding: 7px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+#ctx-menu .mi:hover { background: var(--surface-alt); }
+
+/* ── Right inspector panel ───────────────────────────────── */
+#panel { width: var(--panel-width); background: var(--panel-bg); border-left: 1px solid var(--panel-border); display: flex; flex-direction: column; z-index: 150; overflow: hidden; }
+#panel-header { padding: 14px 16px 0; border-bottom: 1px solid var(--hairline); }
+.panel-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+#panel-title { font-size: 15px; font-weight: 700; line-height: 1.25; }
+#panel-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+#breadcrumb { font-size: 11px; color: var(--text-secondary); margin-top: 6px; line-height: 1.4; }
+#breadcrumb a { color: var(--brand-teal-ink); cursor: pointer; }
+#panel-tabs { display: flex; gap: 2px; margin-top: 12px; }
+.ptab { font-size: 10px; padding: 7px 8px; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent; white-space: nowrap; }
+.ptab.active { color: var(--brand-dark); border-bottom-color: var(--brand-teal); font-weight: 600; }
+#panel-body { flex: 1; overflow-y: auto; padding: 14px 16px; }
+.panel-section { margin-bottom: 18px; }
+.panel-section h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: var(--text-muted); margin-bottom: 8px; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat { background: var(--surface-alt); border-radius: 8px; padding: 11px; border: 1px solid var(--hairline); }
+.stat .val { font-size: 19px; font-weight: 700; color: var(--brand-dark); }
+.stat .val.critical { color: var(--risk-critical); }
+.stat .lbl { font-size: 10px; color: var(--text-secondary); margin-top: 3px; }
+.kv { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--hairline); }
+.kv span:first-child { color: var(--text-secondary); }
+.kv span:last-child { font-weight: 600; }
+.risk-pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 5px; text-transform: uppercase; letter-spacing: .3px; }
+.risk-pill.critical { background: #ffe6dd; color: #c2360b; }
+.risk-pill.high { background: #ffeed6; color: #9a5600; }
+.risk-pill.medium { background: #fff5d6; color: #8a6500; }
+.risk-pill.low { background: #e2f2fb; color: #0a5e85; }
+.risk-pill.none { background: #eef1f5; color: var(--text-secondary); }
+.path-item { padding: 10px; border-radius: 8px; border: 1px solid var(--panel-border); margin-bottom: 8px; cursor: pointer; font-size: 11px; line-height: 1.4; }
+.path-item:hover, .path-item.active { border-color: var(--brand-teal); background: var(--surface-alt); }
+.path-item.sev-critical { border-left: 4px solid var(--risk-critical); }
+.path-item.sev-high { border-left: 4px solid var(--risk-high); }
+.path-meta { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
+.sev-filter { display: flex; gap: 6px; margin-bottom: 10px; }
+.sev-filter .fchip.on.crit { background: var(--risk-critical); border-color: var(--risk-critical); color: #fff; }
+.alert-row { padding: 10px; border-radius: 8px; border-left: 3px solid; margin-bottom: 8px; background: var(--surface-alt); cursor: pointer; font-size: 11px; }
+.alert-row.critical { border-left-color: var(--alert-critical); }
+.alert-row.high { border-left-color: var(--alert-high); }
+.alert-row.medium { border-left-color: var(--alert-medium); }
+.alert-row.info { border-left-color: var(--alert-info); }
+.alert-row.acked { opacity: .6; }
+.alert-time { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.ownership-chain .entity { padding: 8px 11px; background: var(--surface-alt); border: 1px solid var(--hairline); border-radius: 6px; margin: 4px 0; font-size: 11px; }
+.ownership-chain .entity.sanctioned { border-left: 3px solid var(--alert-critical); }
+.ownership-chain .arrow { text-align: center; color: var(--text-muted); font-size: 11px; }
+.timeline { border-left: 2px solid var(--hairline); padding-left: 14px; margin-left: 4px; }
+.tl-item { position: relative; padding: 4px 0 12px; font-size: 11px; }
+.tl-item::before { content: ""; position: absolute; left: -21px; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); border: 2px solid var(--surface); }
+.tl-item.critical::before { background: var(--alert-critical); }
+.tl-item.high::before { background: var(--alert-high); }
+.tl-date { color: var(--text-muted); font-size: 10px; }
+.trend-chip { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.trend-chip.escalating { background: #ffe6dd; color: #c2360b; }
+.trend-chip.stabilising { background: #e2f4ea; color: #1e7a45; }
+.hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+.empty-state { color: var(--text-muted); font-size: 12px; line-height: 1.6; padding: 16px 0; }
+.pbtn { display: inline-block; background: var(--brand-teal); color: var(--brand-dark); border: none; padding: 8px 13px; border-radius: 7px; font-size: 11px; font-weight: 600; cursor: pointer; margin: 4px 6px 4px 0; }
+.pbtn.ghost { background: var(--surface-alt); color: var(--text-primary); border: 1px solid var(--panel-border); }
+.pbtn:hover { filter: brightness(1.05); }
+.lksg-flag { background: #fff4e6; border: 1px solid var(--risk-high); color: #8a4b00; padding: 8px 11px; border-radius: 8px; font-size: 11px; margin-bottom: 12px; }
+
+/* Alert drawer */
+#alert-drawer { position: fixed; top: 48px; right: 0; width: 400px; bottom: 0; background: var(--panel-bg); border-left: 1px solid var(--panel-border); box-shadow: -8px 0 24px rgba(0,30,80,.1); z-index: 400; transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; }
+#alert-drawer.open { transform: translateX(0); }
+#alert-drawer-header { padding: 16px; border-bottom: 1px solid var(--hairline); display: flex; justify-content: space-between; align-items: center; }
+#alert-drawer-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+/* Toast */
+#toast { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%); background: var(--brand-dark); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 12px; z-index: 600; opacity: 0; transition: opacity .2s; pointer-events: none; box-shadow: var(--shadow); }
+#toast.show { opacity: 1; }
+
+#loading { position: absolute; inset: 0; background: rgba(238,242,247,.85); display: flex; align-items: center; justify-content: center; z-index: 300; font-size: 13px; color: var(--brand-dark); }
+#loading.hidden { display: none; }
+
+#present-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 500; display: none; }
+
+/* ── Welcome overlay ─────────────────────────────────────── */
+#welcome-overlay { position: fixed; inset: 0; z-index: 700; background: rgba(0,30,80,.55); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 24px; }
+#welcome-overlay.show { display: flex; }
+.welcome-card { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); max-width: 960px; width: 100%; max-height: 92vh; overflow-y: auto; }
+.welcome-head { background: var(--brand-dark); color: #fff; padding: 22px 28px; }
+.welcome-head h2 { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
+.welcome-head p { font-size: 13px; color: #aee6ff; margin-top: 7px; line-height: 1.55; max-width: 720px; }
+.welcome-body { padding: 22px 28px 26px; }
+.welcome-body .wsub { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--text-muted); margin-bottom: 12px; }
+.scenario-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.wcard { text-align: left; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; cursor: pointer; background: var(--surface-alt); transition: border-color .15s, transform .15s, box-shadow .15s; display: flex; flex-direction: column; font: inherit; }
+.wcard:hover { border-color: var(--brand-teal); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.wcard .wtag { font-size: 10px; font-weight: 700; color: var(--brand-teal-ink); letter-spacing: .5px; text-transform: uppercase; }
+.wcard h3 { font-size: 14px; color: var(--brand-dark); margin: 6px 0 9px; line-height: 1.25; }
+.wcard .wq { font-size: 11px; font-style: italic; color: var(--text-primary); margin-bottom: 9px; line-height: 1.45; }
+.wcard .wfail { font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.wcard .wblock { font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.wcard .wlabel { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--brand-teal-ink); font-weight: 700; margin-bottom: 3px; }
+.wcard .waha { font-size: 11px; color: #8a4b00; background: #fff3e6; border: 1px solid #ffe0bd; border-radius: 6px; padding: 8px 9px; line-height: 1.45; margin-top: auto; }
+.wcard .wgo { margin-top: 11px; font-size: 11px; font-weight: 700; color: var(--brand-teal-ink); }
+.welcome-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+.welcome-actions .spacer { flex: 1; }
+.wbtn { border: none; border-radius: 8px; padding: 10px 18px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.wbtn.primary { background: var(--brand-teal); color: var(--brand-dark); }
+.wbtn.ghost { background: var(--surface-alt); color: var(--text-primary); border: 1px solid var(--panel-border); }
+.wbtn:hover { filter: brightness(1.04); }
+.wcheck { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.wcheck input { accent-color: var(--brand-teal); }
+
+/* ── Coach-mark tour ─────────────────────────────────────── */
+#tour-layer { position: fixed; inset: 0; z-index: 720; display: none; }
+#tour-layer.show { display: block; }
+#tour-spotlight { position: absolute; border-radius: 10px; box-shadow: 0 0 0 3px var(--brand-teal), 0 0 0 9999px rgba(0,30,80,.55); transition: all .25s ease; pointer-events: none; }
+#tour-tooltip { position: absolute; width: 288px; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow); padding: 16px; transition: top .25s ease, left .25s ease; }
+#tour-tooltip h4 { font-size: 13px; color: var(--brand-dark); margin-bottom: 6px; }
+#tour-tooltip p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.tour-foot { display: flex; align-items: center; margin-top: 14px; gap: 8px; }
+.tour-count { font-size: 11px; color: var(--text-muted); }
+.tour-foot .spacer { flex: 1; }
+.tbtn-sm { border: none; border-radius: 7px; padding: 7px 13px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.tbtn-sm.primary { background: var(--brand-teal); color: var(--brand-dark); }
+.tbtn-sm.ghost { background: var(--surface-alt); color: var(--text-primary); border: 1px solid var(--panel-border); }
+.tbtn-sm:disabled { opacity: .4; cursor: default; }
+
+/* ── Scenario narration coach ────────────────────────────── */
+#scenario-coach { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); z-index: 140; width: 468px; max-width: 80%; background: var(--surface); border: 1px solid var(--panel-border); border-top: 3px solid var(--brand-teal); border-radius: 12px; box-shadow: var(--shadow); padding: 14px 16px; display: none; }
+#scenario-coach.show { display: block; }
+.sc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.sc-title { font-size: 13px; font-weight: 700; color: var(--brand-dark); }
+.sc-step { font-size: 10px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+.sc-close { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 2px; }
+.sc-close:hover { color: var(--text-primary); }
+.sc-head { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.sc-body { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.sc-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.sc-foot .spacer { flex: 1; }
+.sc-dots { display: flex; gap: 5px; align-items: center; }
+.sc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--panel-border); }
+.sc-dot.on { background: var(--brand-teal); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="toolbar">
+    <h1>N-TIER SUPPLIER MONITOR</h1>
+    <span class="badge">GRAPH EXPLORER</span>
+    <button type="button" class="tbtn" id="btn-filters" title="Toggle filters (Ctrl+F)">Filters</button>
+    <button type="button" class="tbtn" id="btn-guide" title="Demo guide & walkthrough">Guide</button>
+    <div class="toolbar-spacer"></div>
+    <div id="search-wrap">
+      <span class="search-icon">&#128269;</span>
+      <input id="search" type="search" placeholder="Search… (Ctrl+K)" autocomplete="off">
+      <div id="search-results"></div>
+    </div>
+    <button type="button" class="tbtn" id="btn-concentration" title="Concentration leaderboard (Q2)">Concentration</button>
+    <button type="button" class="tbtn" id="btn-ownership" title="Ownership overlay">Ownership</button>
+    <button type="button" class="tbtn" id="btn-clear-trace" title="Clear trace (Esc)">Clear</button>
+    <div class="menu-wrap">
+      <button type="button" class="tbtn" id="btn-views">Views &#9662;</button>
+      <div class="menu-pop" id="views-menu"></div>
+    </div>
+    <div class="menu-wrap">
+      <button type="button" class="tbtn" id="btn-export">Export &#9662;</button>
+      <div class="menu-pop" id="export-menu">
+        <div class="mi" data-export="png">Download PNG<small>Snapshot of current view</small></div>
+        <div class="mi" data-export="link">Copy share link<small>Deep link with current state</small></div>
+        <div class="mi" data-export="present">Present mode<small>Hide chrome (Esc to exit)</small></div>
+      </div>
+    </div>
+    <button type="button" class="tbtn tbtn-icon" id="btn-alerts" title="Alerts">&#9888;<span class="alert-badge" id="alert-count">0</span></button>
+  </header>
+
+  <div id="main">
+    <aside id="filter-panel" class="collapsed">
+      <div id="filter-head"><strong>Filters &amp; Layers</strong><button type="button" class="tbtn" id="filter-clear" style="background:var(--surface-alt);color:var(--text-primary);border-color:var(--panel-border)">Clear</button></div>
+      <div id="filter-body"></div>
+    </aside>
+
+    <div id="canvas-wrap">
+      <div id="loading">Loading supply network…</div>
+      <div id="cy"></div>
+      <button type="button" id="filter-toggle-tab">Filters</button>
+
+      <div id="scenario-bar">
+        <button type="button" class="scenario-btn" data-scenario="a"><strong>A · One Chip, Two Platforms</strong><span>Blast radius from SilTech → EV + combustion</span></button>
+        <button type="button" class="scenario-btn" data-scenario="b"><strong>B · The Redundancy That Wasn't</strong><span>Dual-sourced brakes share one fab</span></button>
+        <button type="button" class="scenario-btn" data-scenario="c"><strong>C · The Safe European Supplier</strong><span>Hidden shared owner: Hongqiao</span></button>
+      </div>
+
+      <div id="spof-banner"><span id="spof-banner-text"></span><button type="button" id="spof-highlight">Highlight all</button></div>
+      <div id="active-chips"></div>
+
+      <div id="legend">
+        <div class="title">Risk level</div>
+        <div class="legend-row"><span class="dot" style="border-color:#FF4500"></span> Critical</div>
+        <div class="legend-row"><span class="dot" style="border-color:#FF8C00"></span> High</div>
+        <div class="legend-row"><span class="dot" style="border-color:#E0A100"></span> Medium</div>
+        <div class="legend-row"><span class="dot" style="border-color:#2393c9"></span> Low</div>
+        <div class="legend-row"><span class="dot" style="border-color:#1e9e57"></span> Healthy path</div>
+        <div class="title" style="margin-top:10px">Entity type</div>
+        <div id="legend-types"></div>
+      </div>
+
+      <div id="action-bubble"></div>
+      <div id="ctx-menu"></div>
+
+      <div id="bottom-right">
+        <div id="layout-switch">
+          <button type="button" data-layout="dagre" class="active">Hierarchy</button>
+          <button type="button" data-layout="cose">Force</button>
+          <button type="button" data-layout="geo">Geographic</button>
+        </div>
+        <div id="zoom-cluster">
+          <button type="button" class="zbtn" id="zoom-in">+</button>
+          <button type="button" class="zbtn" id="zoom-out">&minus;</button>
+          <button type="button" class="zbtn" id="zoom-fit">&#9974;</button>
+        </div>
+      </div>
+
+      <div id="scenario-coach">
+        <div class="sc-top">
+          <span class="sc-title" id="sc-title"></span>
+          <span class="sc-step" id="sc-step"></span>
+          <button type="button" class="sc-close" id="sc-close" title="Close walkthrough">&times;</button>
+        </div>
+        <div class="sc-head" id="sc-head"></div>
+        <div class="sc-body" id="sc-body"></div>
+        <div class="sc-foot">
+          <div class="sc-dots" id="sc-dots"></div>
+          <span class="spacer"></span>
+          <button type="button" class="tbtn-sm ghost" id="sc-back">Back</button>
+          <button type="button" class="tbtn-sm primary" id="sc-next">Next</button>
+        </div>
+      </div>
+
+      <div id="info-strip"><span id="info-text">Click a supplier · Trace impact · Toggle ownership · Esc clears</span><span id="info-count"></span></div>
+    </div>
+
+    <aside id="panel">
+      <div id="panel-header">
+        <div class="panel-top">
+          <div style="min-width:0">
+            <div id="panel-title">Graph Explorer</div>
+            <div id="panel-sub">Select a supplier to inspect risk signals</div>
+            <div id="breadcrumb"></div>
+          </div>
+          <button type="button" class="pbtn" id="btn-trace" style="display:none">Trace impact &rarr;</button>
+        </div>
+        <div id="panel-tabs" style="display:none"></div>
+      </div>
+      <div id="panel-body">
+        <div class="empty-state" id="panel-empty">Use the scenario buttons up top, search for <strong>SilTech</strong>, or click any supplier on the map to inspect its risk profile and trace its blast radius.</div>
+        <div id="panel-content" style="display:none"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="welcome-overlay">
+  <div class="welcome-card">
+    <div class="welcome-head">
+      <h2>N-tier Supplier Monitor &mdash; Graph Explorer</h2>
+      <p>One connected supply-chain map. Three questions a flat supplier table structurally can't answer. Pick a scenario to be walked through it step by step, or take a quick tour of the workspace.</p>
+    </div>
+    <div class="welcome-body">
+      <div class="wsub">Guided scenarios &mdash; click one to start</div>
+      <div class="scenario-cards" id="welcome-cards"></div>
+      <div class="welcome-actions">
+        <label class="wcheck"><input type="checkbox" id="welcome-dismiss"> Don't show this on load again</label>
+        <div class="spacer"></div>
+        <button type="button" class="wbtn ghost" id="welcome-explore">Explore on my own</button>
+        <button type="button" class="wbtn primary" id="welcome-tour">Take the panel tour</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tour-layer">
+  <div id="tour-spotlight"></div>
+  <div id="tour-tooltip">
+    <h4 id="tour-title"></h4>
+    <p id="tour-body"></p>
+    <div class="tour-foot">
+      <span class="tour-count" id="tour-count"></span>
+      <span class="spacer"></span>
+      <button type="button" class="tbtn-sm ghost" id="tour-back">Back</button>
+      <button type="button" class="tbtn-sm primary" id="tour-next">Next</button>
+    </div>
+  </div>
+</div>
+
+<div id="alert-drawer">
+  <div id="alert-drawer-header"><strong>Alerts</strong><div><button type="button" class="tbtn" id="btn-broadcast" style="background:var(--surface-alt);color:var(--text-primary);border-color:var(--panel-border)">Simulate (Shift+D)</button> <button type="button" class="tbtn" id="btn-close-alerts" style="background:var(--surface-alt);color:var(--text-primary);border-color:var(--panel-border)">Close</button></div></div>
+  <div id="alert-drawer-body"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  try {
+    if (typeof cytoscapeDagre !== "undefined") cytoscape.use(cytoscapeDagre);
+    else if (typeof window !== "undefined" && window.cytoscapeDagre) cytoscape.use(window.cytoscapeDagre);
+  } catch (e) { /* already registered */ }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var OWNERSHIP_TYPES = new Set(["intermediate_holding", "ultimate_parent", "financial_sponsor"]);
+  var HEALTHY_IDS = new Set(["part_dcdc", "asm_dcdc", "t1_bosch", "t1_continental", "t2_infineon", "t2_renesas"]);
+  var HEALTHY_EDGES = new Set(["e_bosch_dcdc", "e_conti_dcdc", "e_dcdc_asm", "e_dcdc_id4", "e_inf_bosch", "e_ren_conti"]);
+
+  var app = {
+    cy: null, selection: null, trace: null, ownershipOn: false,
+    searchTimer: null, layout: "dagre", inspectorTab: "overview",
+    posCache: {}, layers: {}, present: false,
+    filters: { tiers: new Set(), risk: new Set(), riskType: new Set(), country: new Set(), program: new Set(), plant: new Set(), commodity: new Set(), spofOnly: false, lksgOnly: false }
+  };
+
+  /* ── Element builders ─────────────────────────────────── */
+  function enrichNode(n) {
+    var d = Object.assign({}, n.data);
+    d.spof = !!d.single_point_of_failure;
+    if (d.label && d.label.indexOf("\n") >= 0) d.label = d.label.replace(/\n/g, " ");
+    var sz = nodeSize(d); d.w = sz.w; d.h = sz.h;
+    return { data: d };
+  }
+  function supplyElements() {
+    var nodes = GRAPH.nodes.filter(function (n) { return !OWNERSHIP_TYPES.has(n.data.type); }).map(enrichNode);
+    var edges = GRAPH.edges.filter(function (e) { return e.data.layoutClass !== "ownership"; }).map(function (e) { return { data: Object.assign({}, e.data, { label: "" }) }; });
+    return nodes.concat(edges);
+  }
+  function ownershipElements() {
+    var nodes = GRAPH.nodes.filter(function (n) { return OWNERSHIP_TYPES.has(n.data.type); }).map(enrichNode);
+    var edges = GRAPH.edges.filter(function (e) { return e.data.layoutClass === "ownership"; }).map(function (e) {
+      return { data: Object.assign({}, e.data, { label: e.data.stake ? Math.round(e.data.stake * 100) + "%" : "" }) };
+    });
+    return nodes.concat(edges);
+  }
+  function nodeSize(d) {
+    if (d.type === "plant") return { w: 54, h: 38 };
+    if (d.type === "program") return { w: 48, h: 44 };
+    if (d.type === "assembly") return { w: 42, h: 42 };
+    if (d.type === "part") return { w: 36, h: 36 };
+    if (d.type === "site") return { w: 34, h: 34 };
+    if (d.type === "supplier") return { w: 34 + (4 - (d.tier || 2)) * 4, h: 34 + (4 - (d.tier || 2)) * 4 };
+    if (d.type === "oem") return { w: 60, h: 60 };
+    if (d.type === "ultimate_parent") return { w: 56, h: 50 };
+    return { w: 42, h: 42 };
+  }
+
+  // Small corner type-badge as an SVG data-URI (drawn as a background image).
+  function typeBadge(text) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="22">'
+      + '<rect x="0" y="0" width="34" height="22" rx="7" fill="#001e50"/>'
+      + '<text x="17" y="12" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700"'
+      + ' fill="#ffffff" text-anchor="middle" dominant-baseline="central">' + text + '</text></svg>';
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+
+  function buildStylesheet() {
+    return [
+      { selector: "node", style: {
+        label: "data(label)", "font-size": 9, "font-family": "Inter, sans-serif",
+        color: "#14233b", "text-valign": "bottom", "text-margin-y": 5, "text-wrap": "wrap",
+        "text-max-width": 92, "background-color": "#ffffff", "border-width": 2,
+        "border-color": "#c0ccdb", width: "data(w)", height: "data(h)", shape: "ellipse",
+        "text-outline-color": "#ffffff", "text-outline-width": 2,
+        // defaults for the corner type badge (background-image, top-right)
+        "background-fit": "none", "background-clip": "none", "background-image-containment": "over",
+        "bounds-expansion": 12, "background-width": "20px", "background-height": "13px",
+        "background-position-x": "100%", "background-position-y": "0%", "background-image-opacity": 1
+      }},
+      /* ── Shape + fill encode ENTITY TYPE (every type unique; survives risk colouring) ── */
+      { selector: 'node[type = "oem"]', style: { shape: "star", "background-color": "#001e50", color: "#fff", "text-outline-color": "#001e50", "border-color": "#001e50", "border-width": 3 } },
+      { selector: 'node[type = "program"]', style: { shape: "pentagon", "background-color": "#cdd9f0", "border-color": "#5a7299", "background-image": typeBadge("PG") } },
+      { selector: 'node[type = "plant"]', style: { shape: "round-rectangle", "background-color": "#d4e7df", "border-color": "#4f7a68", "background-image": typeBadge("PL") } },
+      { selector: 'node[type = "assembly"]', style: { shape: "hexagon", "background-color": "#dde8f6", "border-color": "#5a7299", "background-image": typeBadge("AS") } },
+      { selector: 'node[type = "part"]', style: { shape: "round-hexagon", "background-color": "#eef3fb", "border-color": "#7d8ba0", "background-image": typeBadge("PT") } },
+      { selector: 'node[type = "site"]', style: { shape: "barrel", "background-color": "#ece3d4", "border-color": "#9a8a66", "background-image": typeBadge("SI") } },
+      { selector: 'node[type = "supplier"]', style: { shape: "ellipse", "background-color": "#ffffff", "border-color": "#9aa7b8" } },
+      { selector: 'node[type = "supplier"][tier = 1]', style: { "background-image": typeBadge("T1") } },
+      { selector: 'node[type = "supplier"][tier = 2]', style: { "background-image": typeBadge("T2") } },
+      { selector: 'node[type = "supplier"][tier = 3]', style: { "background-image": typeBadge("T3") } },
+      { selector: 'node[type = "ultimate_parent"]', style: { shape: "diamond", "background-color": "#fde3e3", "border-color": "#E53935", "border-width": 3, "background-image": typeBadge("UP") } },
+      { selector: 'node[type = "intermediate_holding"]', style: { shape: "cut-rectangle", "background-color": "#ece9f4", "border-color": "#7a5bd0", "border-style": "dashed", "background-image": typeBadge("H") } },
+      { selector: 'node[type = "financial_sponsor"]', style: { shape: "round-diamond", "background-color": "#efeaf7", "border-color": "#7a5bd0", "background-image": typeBadge("FS") } },
+      /* ── Border colour/width + glow encode RISK (no longer touches the type fill) ── */
+      { selector: 'node[risk_level = "critical"]', style: { "border-color": "#FF4500", "border-width": 4, "underlay-color": "#FF4500", "underlay-opacity": 0.28, "underlay-padding": 7 } },
+      { selector: 'node[risk_level = "high"]', style: { "border-color": "#FF8C00", "border-width": 3 } },
+      { selector: 'node[risk_level = "medium"]', style: { "border-color": "#E0A100", "border-width": 2.5 } },
+      { selector: 'node[risk_level = "low"]', style: { "border-color": "#2393c9", "border-width": 2 } },
+      { selector: "node[?spof]", style: { "border-style": "double", "border-width": 6 } },
+      { selector: "node.selected", style: { "border-color": "#00b0f0", "border-width": 4 } },
+      { selector: "node.dim", style: { opacity: 0.13 } },
+      { selector: "edge.dim", style: { opacity: 0.06 } },
+      { selector: "node.hidden", style: { display: "none" } },
+      { selector: "edge.hidden", style: { display: "none" } },
+      { selector: "node.trace-source", style: { "border-color": "#FF4500", "background-color": "#ffe0d4", "border-width": 5 } },
+      { selector: "node.trace-affected", style: { opacity: 1 } },
+      { selector: "node.trace-peripheral", style: { opacity: 0.4 } },
+      { selector: "node.trace-unaffected", style: { opacity: 0.13 } },
+      { selector: "node.trace-healthy", style: { "border-color": "#1e9e57", "border-width": 3, opacity: 1, "background-color": "#e7f6ee" } },
+      { selector: "node.search-hit", style: { "border-color": "#00b0f0", "border-width": 4 } },
+      { selector: "node.layer-hit", style: { "border-color": "#00b0f0", "border-width": 4 } },
+      { selector: "node.scenario-focus", style: { "border-color": "#00b0f0", "border-width": 5 } },
+      { selector: "node.convergence", style: { "background-color": "#ffedd6", "border-color": "#FF8C00", "border-width": 4 } },
+      { selector: "node.spof-flash", style: { "border-color": "#E53935", "border-width": 6 } },
+      { selector: "edge", style: {
+        width: 1.3, "line-color": "#c4d0df", "target-arrow-shape": "triangle",
+        "target-arrow-color": "#aebccd", "curve-style": "bezier", opacity: 0.8,
+        label: "data(label)", "font-size": 8, color: "#5a6b80", "text-background-color": "#fff",
+        "text-background-opacity": 0.8, "text-background-padding": 2
+      }},
+      { selector: 'edge[relationship = "OWNED_BY"]', style: {
+        "line-style": "dotted", "line-color": "#e0902a", "target-arrow-color": "#e0902a", width: 2,
+        "curve-style": "unbundled-bezier", "control-point-distances": -70, "control-point-weights": 0.5, opacity: 0.85
+      }},
+      { selector: 'edge[relationship = "QUALIFIED_FOR"]', style: { "line-style": "dashed", "line-color": "#7a5bd0" } },
+      { selector: "edge.trace-path", style: { "line-color": "#FF4500", width: 3, opacity: 1, "target-arrow-color": "#FF4500" } },
+      { selector: "edge.trace-healthy", style: { "line-color": "#1e9e57", width: 2.5, opacity: 1, "target-arrow-color": "#1e9e57" } },
+      { selector: "edge.trace-dim", style: { opacity: 0.06 } },
+      { selector: "edge.convergence", style: { "line-color": "#FF8C00", width: 3, "target-arrow-color": "#FF8C00" } },
+      { selector: "edge.layer-hit", style: { "line-color": "#00b0f0", width: 2.4, opacity: 1 } }
+    ];
+  }
+
+  /* ── Layouts ──────────────────────────────────────────── */
+  function layoutEdgesSel() {
+    return app.cy.edges().filter(function (e) { return e.data("layoutClass") !== "ownership" && !e.hasClass("hidden"); });
+  }
+  function runDagre(fit) {
+    var l = app.cy.layout({ name: "dagre", eles: app.cy.nodes().not(".hidden").union(layoutEdgesSel()), rankDir: "TB", nodeSep: 42, rankSep: 72, padding: 40, animate: true, animationDuration: 400, nodeDimensionsIncludeLabels: true });
+    l.one("layoutstop", function () { cachePositions(); if (fit !== false) app.cy.fit(undefined, 60); });
+    l.run();
+  }
+  function runCose(fit) {
+    var l = app.cy.layout({ name: "cose", animate: true, animationDuration: 600, nodeRepulsion: function () { return 12000; }, idealEdgeLength: function () { return 90; }, padding: 40, randomize: false });
+    l.one("layoutstop", function () { if (fit !== false) app.cy.fit(undefined, 60); });
+    l.run();
+  }
+  function runGeo() {
+    var W = 1600, H = 900;
+    var coords = {};
+    app.cy.nodes().forEach(function (n) { if (n.data("lat") != null && n.data("lng") != null) coords[n.id()] = [n.data("lng"), n.data("lat")]; });
+    for (var pass = 0; pass < 4; pass++) {
+      app.cy.nodes().forEach(function (n) {
+        if (coords[n.id()]) return;
+        var sx = 0, sy = 0, c = 0;
+        n.neighborhood("node").forEach(function (m) { if (coords[m.id()]) { sx += coords[m.id()][0]; sy += coords[m.id()][1]; c++; } });
+        if (c) coords[n.id()] = [sx / c, sy / c];
+      });
+    }
+    var pos = {};
+    app.cy.nodes().forEach(function (n) {
+      var ll = coords[n.id()] || [10, 50];
+      pos[n.id()] = { x: (ll[0] + 10) / 30 * W, y: (62 - ll[1]) / 62 * H };
+    });
+    app.cy.layout({ name: "preset", positions: pos, animate: true, animationDuration: 500, fit: true, padding: 50 }).run();
+  }
+  function cachePositions() { app.cy.nodes().forEach(function (n) { app.posCache[n.id()] = Object.assign({}, n.position()); }); }
+  function applyLayout(name, fit) {
+    app.layout = name;
+    document.querySelectorAll("#layout-switch button").forEach(function (b) { b.classList.toggle("active", b.dataset.layout === name); });
+    if (name === "dagre") runDagre(fit);
+    else if (name === "cose") runCose(fit);
+    else runGeo();
+  }
+
+  /* ── Init ─────────────────────────────────────────────── */
+  function initCy() {
+    app.cy = cytoscape({ container: $("cy"), elements: supplyElements(), style: buildStylesheet(), minZoom: 0.12, maxZoom: 3, wheelSensitivity: 0.2 });
+    app.cy.on("tap", "node", function (evt) { selectNode(evt.target.id()); });
+    app.cy.on("tap", function (evt) { if (evt.target === app.cy) { clearSelection(); hideCtx(); } });
+    app.cy.on("cxttap", "node", function (evt) { showCtx(evt.target.id(), evt.renderedPosition); });
+    app.cy.on("pan zoom position", positionBubble);
+    runDagre();
+    $("loading").classList.add("hidden");
+    buildFilterPanel();
+    buildLegendTypes();
+    updateCounts();
+    updateSpofBanner();
+    readHash();
+  }
+
+  function formatEuro(n) { if (n >= 1e6) return "€" + (n / 1e6).toFixed(1) + "M"; if (n >= 1e3) return "€" + Math.round(n / 1e3) + "K"; return "€" + n; }
+  function setInfo(t) { $("info-text").textContent = t; }
+  function toast(t) { var el = $("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(app.toastT); app.toastT = setTimeout(function () { el.classList.remove("show"); }, 2200); }
+
+  function updateCounts() {
+    var vis = app.cy.nodes().not(".hidden");
+    var sup = vis.filter('[type="supplier"]').length, parts = vis.filter('[type="part"]').length;
+    var plants = vis.filter('[type="plant"]').length, progs = vis.filter('[type="program"]').length;
+    var totSup = app.cy.nodes('[type="supplier"]').length;
+    $("info-count").textContent = "Showing " + sup + "/" + totSup + " suppliers · " + parts + " parts · " + plants + " plants · " + progs + " programs";
+  }
+  function updateSpofBanner() {
+    var spof = app.cy.nodes("[?spof]").not(".hidden");
+    var b = $("spof-banner");
+    if (spof.length) { b.classList.add("show"); $("spof-banner-text").textContent = "\u26A0 " + spof.length + " single points of failure in view"; }
+    else b.classList.remove("show");
+  }
+
+  /* ── Legend: shape = entity type ──────────────────────── */
+  function shapeGlyph(kind) {
+    var st = '#5a7299', s = '<svg width="14" height="14" viewBox="0 0 24 24" style="flex:none">';
+    var g = {
+      star:     '<polygon points="12,2 15,9 22,9 16,14 18,22 12,17 6,22 8,14 2,9 9,9" fill="#001e50" stroke="#001e50"/>',
+      pentagon: '<polygon points="12,3 22,10 18,22 6,22 2,10" fill="#cdd9f0" stroke="' + st + '"/>',
+      rrect:    '<rect x="2" y="6" width="20" height="12" rx="3" fill="#d4e7df" stroke="#4f7a68"/>',
+      hexagon:  '<polygon points="6,4 18,4 23,12 18,20 6,20 1,12" fill="#dde8f6" stroke="' + st + '"/>',
+      rhexagon: '<polygon points="7,5 17,5 22,12 17,19 7,19 2,12" fill="#eef3fb" stroke="#7d8ba0" stroke-width="2" stroke-linejoin="round"/>',
+      barrel:   '<path d="M4 6 Q12 3 20 6 L20 18 Q12 21 4 18 Z" fill="#ece3d4" stroke="#9a8a66"/>',
+      circle:   '<circle cx="12" cy="12" r="9.5" fill="#ffffff" stroke="#9aa7b8"/>',
+      diamond:  '<polygon points="12,2 22,12 12,22 2,12" fill="#fde3e3" stroke="#E53935"/>'
+    };
+    return s + (g[kind] || "") + "</svg>";
+  }
+  function buildLegendTypes() {
+    var rows = [["circle", "Supplier"], ["rhexagon", "Part"], ["hexagon", "Assembly"],
+      ["rrect", "Plant"], ["pentagon", "Program"], ["barrel", "Site"], ["star", "OEM"],
+      ["diamond", "Owner (overlay)"]];
+    $("legend-types").innerHTML = rows.map(function (r) {
+      return '<div class="legend-row">' + shapeGlyph(r[0]) + " " + r[1] + "</div>";
+    }).join("");
+  }
+
+  /* ── Selection / trace clearing ───────────────────────── */
+  function clearTraceClasses() {
+    if (!app.cy) return;
+    app.cy.elements().removeClass("trace-source trace-affected trace-peripheral trace-unaffected trace-healthy trace-path trace-dim convergence scenario-focus search-hit dim");
+    app.cy.edges().removeClass("convergence trace-path trace-healthy trace-dim");
+    app.trace = null;
+  }
+  function clearSelection() {
+    app.selection = null;
+    app.cy.nodes().removeClass("selected");
+    $("btn-trace").style.display = "none";
+    $("action-bubble").classList.remove("show");
+    showPanelEmpty();
+    setInfo("Click a supplier · Trace impact · Toggle ownership · Esc clears");
+  }
+  function showPanelEmpty() {
+    $("panel-empty").style.display = "block";
+    $("panel-content").style.display = "none";
+    $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Graph Explorer";
+    $("panel-sub").textContent = "Select a supplier to inspect risk signals";
+    $("breadcrumb").innerHTML = "";
+  }
+
+  /* ── Inspector (tabbed) ───────────────────────────────── */
+  var TABS = [["overview", "Overview"], ["supply", "Supply Path"], ["ownership", "Ownership"], ["risk", "Risk Signals"], ["alerts", "Alert History"]];
+  async function selectNode(id, opts) {
+    opts = opts || {};
+    var node = app.cy.getElementById(id); if (!node.length) return;
+    var d = node.data();
+    app.selection = id;
+    app.cy.nodes().removeClass("selected");
+    node.addClass("selected");
+    $("btn-trace").style.display = (d.type === "supplier" || d.type === "part") ? "inline-block" : "none";
+
+    $("panel-empty").style.display = "none";
+    $("panel-content").style.display = "block";
+    $("panel-title").textContent = d.name || d.label;
+    $("panel-sub").textContent = [d.type === "supplier" ? "Tier " + d.tier + " supplier" : d.type.replace(/_/g, " "), d.country, d.risk_level && d.risk_level !== "none" ? d.risk_level + " risk" : ""].filter(Boolean).join(" · ");
+
+    var tabsEl = $("panel-tabs"); tabsEl.style.display = "flex";
+    tabsEl.innerHTML = TABS.map(function (t) { return '<div class="ptab' + (t[0] === app.inspectorTab ? " active" : "") + '" data-tab="' + t[0] + '">' + t[1] + "</div>"; }).join("");
+    tabsEl.querySelectorAll(".ptab").forEach(function (el) { el.addEventListener("click", function () { app.inspectorTab = el.dataset.tab; renderInspectorTab(id); tabsEl.querySelectorAll(".ptab").forEach(function (x) { x.classList.toggle("active", x === el); }); }); });
+
+    await renderInspectorTab(id);
+    positionBubble();
+    showBubble(id);
+
+    if (opts.autoTrace && d.autoTrace) setTimeout(function () { runTrace(id); }, 600);
+    if (!opts.noFit) app.cy.animate({ center: { eles: node }, zoom: Math.max(1.1, app.cy.zoom()) }, { duration: 400 });
+  }
+
+  async function renderInspectorTab(id) {
+    var d = app.cy.getElementById(id).data();
+    var entity = await mockApi.getEntity(id);
+    var html = "";
+    if (app.inspectorTab === "overview") {
+      if (d.risk_level) html += '<p style="margin-bottom:12px"><span class="risk-pill ' + d.risk_level + '">' + d.risk_level + (d.risk_type && d.risk_type !== "none" ? " — " + d.risk_type.replace(/_/g, " ") : "") + "</span></p>";
+      if (d.lksgDisclosureRequired) html += '<div class="lksg-flag">\u26A0 LkSG: substantiated knowledge — due-diligence documentation expected.</div>';
+      html += '<div class="panel-section">';
+      [["Type", d.type.replace(/_/g, " ")], ["Country", d.country], ["Tier", d.tier ? "Tier " + d.tier : null], ["Part number", d.part_number], ["Commodity", d.commodity_group], ["Annual volume", d.annual_volume ? d.annual_volume.toLocaleString() : null], ["Financial score", d.financial_score != null ? d.financial_score + "/100" : null], ["Credit rating", d.creditRating], ["Stock cover", d.stock_cover_weeks ? d.stock_cover_weeks + " wks" : null]].forEach(function (kv) {
+        if (kv[1] != null) html += '<div class="kv"><span>' + kv[0] + "</span><span>" + kv[1] + "</span></div>";
+      });
+      html += "</div>";
+      if (d.type === "supplier" || d.type === "part") html += '<button type="button" class="pbtn" id="ip-trace">Trace impact &rarr;</button>';
+      if (d.type === "part") html += '<button type="button" class="pbtn ghost" id="ip-alt">Find alternatives</button><button type="button" class="pbtn ghost" id="ip-sim">Simulate re-source</button>';
+      html += '<button type="button" class="pbtn ghost" id="ip-360">Open Supplier 360</button>';
+    } else if (app.inspectorTab === "supply") {
+      var ins = app.cy.getElementById(id).incomers("node"), outs = app.cy.getElementById(id).outgoers("node");
+      html += '<div class="panel-section"><h3>Upstream (supplies in)</h3>' + (ins.length ? ins.map(function (n) { return '<div class="kv"><span>' + n.data("name") + "</span><span class=\"risk-pill " + (n.data("risk_level") || "none") + "\">" + (n.data("risk_level") || "—") + "</span></div>"; }).join("") : '<p class="hint">No upstream in view.</p>') + "</div>";
+      html += '<div class="panel-section"><h3>Downstream (feeds)</h3>' + (outs.length ? outs.map(function (n) { return '<div class="kv"><span>' + n.data("name") + "</span><span>" + n.data("type") + "</span></div>"; }).join("") : '<p class="hint">No downstream in view.</p>') + "</div>";
+      if (entity.supplies && entity.supplies.length) html += '<div class="panel-section"><h3>Supplies</h3><p class="hint">' + entity.supplies.map(function (s) { return s.partOrEntity + (s.spof ? " (SPOF)" : ""); }).join(", ") + "</p></div>";
+    } else if (app.inspectorTab === "ownership") {
+      if (!entity.ownershipChainAvailable) html += '<p class="hint">No beneficial-ownership chain on record for this entity.</p>';
+      else {
+        var chain = await mockApi.getOwnershipChain(id);
+        html += '<div class="panel-section ownership-chain">';
+        var ents = chain.chain.filter(function (c) { return !c.edge; });
+        ents.forEach(function (c, i) {
+          var cls = c.sanctionScreeningStatus === "sanctioned" ? " sanctioned" : "";
+          html += '<div class="entity' + cls + '"><strong>' + c.name + "</strong>" + (c.country ? " · " + c.country : "") + (c.complianceFlag ? '<br><span class="risk-pill critical" style="margin-top:4px">' + c.complianceFlag.replace(/_/g, " ") + "</span>" : "") + "</div>";
+          if (i < ents.length - 1) html += '<div class="arrow">&darr; owned by</div>';
+        });
+        html += "</div>";
+        if (chain.ultimateParent) html += '<p class="hint">Ultimate parent: <strong>' + chain.ultimateParent.name + "</strong> (" + (chain.ultimateParent.sanctionScreeningStatus || "") + ")</p>";
+        html += '<p class="hint" style="margin-top:8px">' + chain.dataFreshness + "</p>";
+      }
+    } else if (app.inspectorTab === "risk") {
+      html += '<div class="panel-section">';
+      [["Risk level", d.risk_level], ["Risk type", d.risk_type ? d.risk_type.replace(/_/g, " ") : null], ["Alert status", d.alert_status], ["Financial score", d.financial_score != null ? d.financial_score + "/100" : null], ["Leverage", d.leverageRatio ? d.leverageRatio + "x" : null], ["Debt maturity", d.debtMaturityYear], ["PE-owned", d.peOwned ? "Yes" : null], ["Sanction status", d.sanctionScreeningStatus]].forEach(function (kv) { if (kv[1] != null) html += '<div class="kv"><span>' + kv[0] + "</span><span>" + kv[1] + "</span></div>"; });
+      html += "</div>";
+      if (entity.alerts && entity.alerts.length) html += '<div class="panel-section"><h3>Active signals</h3>' + entity.alerts.map(function (a) { return '<div class="alert-row ' + a.severity + '"><strong>' + a.title + "</strong><div class=\"alert-time\">" + a.ts.replace("T", " ") + "</div></div>"; }).join("") + "</div>";
+    } else if (app.inspectorTab === "alerts") {
+      if (entity.history) {
+        html += '<p style="margin-bottom:10px"><span class="trend-chip ' + entity.history.trend + '">' + (entity.history.trend === "escalating" ? "\u2191 Escalating" : "\u2193 Stabilising") + "</span></p>";
+        html += '<div class="timeline">' + entity.history.events.map(function (ev) { return '<div class="tl-item ' + ev.severity + '"><div>' + ev.title + "</div><div class=\"tl-date\">" + ev.date + " · " + ev.status + (ev.ackBy ? " · ack " + ev.ackBy : "") + "</div></div>"; }).join("") + "</div>";
+      } else html += '<p class="hint">No alert history for this entity.</p>';
+    }
+    $("panel-content").innerHTML = html;
+    wireInspectorButtons(id);
+  }
+
+  function wireInspectorButtons(id) {
+    var t = $("ip-trace"); if (t) t.addEventListener("click", function () { runTrace(id); });
+    var a = $("ip-alt"); if (a) a.addEventListener("click", function () { showAlternatives(id); });
+    var s = $("ip-sim"); if (s) s.addEventListener("click", function () { showSimulate(id); });
+    var h = $("ip-360"); if (h) h.addEventListener("click", function () { toast("Supplier 360 — module coming soon (handoff stub)"); });
+  }
+
+  /* ── Impact trace (Q1/Q10) ────────────────────────────── */
+  async function runTrace(sourceId, severityFilter) {
+    clearTraceClasses();
+    var result = await mockApi.traceImpact(sourceId);
+    app.trace = result;
+    var affected = new Set(result.affectedNodeIds); affected.add(sourceId);
+    var affectedEdges = new Set(result.affectedEdgeIds);
+
+    app.cy.getElementById(sourceId).addClass("trace-source");
+    app.cy.nodes().forEach(function (n) {
+      var nid = n.id();
+      if (HEALTHY_IDS.has(nid)) n.addClass("trace-healthy");
+      else if (nid === sourceId) return;
+      else if (affected.has(nid)) n.addClass("trace-affected");
+      else n.addClass("trace-unaffected");
+    });
+    app.cy.edges().forEach(function (e) {
+      if (affectedEdges.has(e.id())) e.addClass("trace-path");
+      else if (HEALTHY_EDGES.has(e.id())) e.addClass("trace-healthy");
+      else e.addClass("trace-dim");
+    });
+
+    var s = result.summary;
+    var progCount = (s.programs || []).length, plantCount = s.plantsAtRisk || 0, first = s.firstLineDown;
+    setInfo(progCount + " programs · " + plantCount + " plants at risk" + (first ? " · first line down in " + first.days + " days" : ""));
+
+    $("panel-empty").style.display = "none";
+    $("panel-content").style.display = "block";
+    $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Impact summary";
+    $("panel-sub").textContent = result.source.name + " · blast radius";
+    $("breadcrumb").innerHTML = '<a id="bc-clear">&larr; ' + result.source.name + "</a> → Impact path";
+    var bc = $("bc-clear"); if (bc) bc.addEventListener("click", function () { clearTraceFull(); });
+
+    var paths = result.paths || [];
+    var sevHtml = '<div class="sev-filter"><span class="fchip on crit" data-sev="critical">Critical</span><span class="fchip on" data-sev="high">High</span><span class="fchip on" data-sev="medium">Medium</span></div>';
+    var pathsHtml = paths.map(function (p, i) {
+      return '<div class="path-item sev-' + p.severity + (i === 0 ? " active" : "") + '" data-path="' + i + '" data-sev="' + p.severity + '"><strong>' + p.label + "</strong><div class=\"path-meta\">" + formatEuro(p.revenueAtRisk) + " · buffer " + p.bufferDays + " days · " + p.severity + "</div></div>";
+    }).join("");
+
+    $("panel-content").innerHTML =
+      '<div class="stat-grid panel-section">' +
+      '<div class="stat"><div class="val critical" id="odo">€0</div><div class="lbl">Revenue at risk</div></div>' +
+      '<div class="stat"><div class="val">' + progCount + '</div><div class="lbl">Programs affected</div></div>' +
+      '<div class="stat"><div class="val">' + plantCount + '</div><div class="lbl">Plants at risk</div></div>' +
+      '<div class="stat"><div class="val">' + (s.spofCount || 0) + '</div><div class="lbl">SPOF parts</div></div></div>' +
+      (first ? '<p style="font-size:12px;margin-bottom:10px;color:var(--risk-critical)"><strong>First line down:</strong> ' + first.program + " in " + first.days + " days</p>" : "") +
+      '<div class="kv"><span>Earliest SOP at risk</span><span>' + (s.earliestSOPatRisk || "—") + "</span></div>" +
+      '<div class="kv"><span>Alternative source</span><span>' + (s.alternativeStatus === "none_independent" ? "None independent" : "Available") + "</span></div>" +
+      '<div class="kv"><span>Qualification lead</span><span>' + (s.qualificationLeadWeeks || "—") + " wks</span></div>" +
+      (s.lksgDisclosureRequired ? '<div class="lksg-flag" style="margin-top:12px">\u26A0 LkSG disclosure may be required for this indirect-supplier risk.</div>' : "") +
+      '<div class="panel-section" style="margin-top:14px"><h3>Path index (' + paths.length + ')</h3>' + sevHtml + pathsHtml + "</div>" +
+      '<button type="button" class="pbtn ghost" id="ip-action">Open in Action Workspace</button>' +
+      '<p class="hint" style="margin-top:8px">Green path: DC-DC converter stays genuinely dual-sourced (Infineon / Renesas).</p>';
+
+    animateOdometer($("odo"), s.revenueAtRisk || 0);
+    var act = $("ip-action"); if (act) act.addEventListener("click", function () { toast("Action Workspace — module coming soon (handoff stub)"); });
+
+    $("panel-content").querySelectorAll(".path-item").forEach(function (el) {
+      el.addEventListener("click", function () {
+        $("panel-content").querySelectorAll(".path-item").forEach(function (x) { x.classList.remove("active"); });
+        el.classList.add("active");
+        highlightPath(paths[+el.dataset.path]);
+      });
+    });
+    $("panel-content").querySelectorAll(".sev-filter .fchip").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        chip.classList.toggle("on");
+        var allowed = new Set(); $("panel-content").querySelectorAll(".sev-filter .fchip.on").forEach(function (c) { allowed.add(c.dataset.sev); });
+        $("panel-content").querySelectorAll(".path-item").forEach(function (pi) { pi.style.display = allowed.has(pi.dataset.sev) ? "block" : "none"; });
+      });
+    });
+
+    app.cy.fit(app.cy.elements(".trace-source, .trace-affected, .trace-healthy"), 70);
+  }
+  function highlightPath(p) {
+    if (!p || !p.hops) return;
+    var ids = p.hops.map(function (h) { return h.id; });
+    app.cy.edges(".trace-path").style("width", 2);
+    for (var i = 0; i < ids.length - 1; i++) {
+      app.cy.getElementById(ids[i]).edgesTo(app.cy.getElementById(ids[i + 1])).style("width", 5);
+    }
+    app.cy.fit(app.cy.collection(ids.map(function (x) { return app.cy.getElementById(x); })), 90);
+  }
+  function animateOdometer(el, target) {
+    var start = performance.now(), dur = 1000;
+    function step(now) {
+      var t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);
+      el.textContent = formatEuro(Math.round(target * e));
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function clearTraceFull() {
+    clearTraceClasses();
+    if (app.selection) selectNode(app.selection, { noFit: true }); else showPanelEmpty();
+  }
+
+  /* ── Q5 alternatives / Q9 simulate ────────────────────── */
+  async function showAlternatives(partId) {
+    var r = await mockApi.getAlternatives(partId, null);
+    $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Alternative paths";
+    $("panel-sub").textContent = app.cy.getElementById(partId).data("name");
+    var html = '<p style="margin-bottom:12px"><span class="risk-pill ' + (r.hasIndependent ? "low" : "critical") + '">' + (r.hasIndependent ? "Independent alternative qualified" : "No independent source") + "</span></p>";
+    html += r.alternatives.map(function (a) {
+      return '<div class="path-item"><strong>' + a.name + "</strong><div class=\"path-meta\">" + a.country + (a.qualifiedOnly ? " · qualified only" : " · active") + (a.sameOwner ? " · ⚠ same owner" : "") + (a.leadTimeWeeks ? " · " + a.leadTimeWeeks + " wks" : "") + "</div></div>";
+    }).join("") || '<p class="hint">No alternatives on record.</p>';
+    $("panel-content").innerHTML = html + '<button type="button" class="pbtn ghost" id="back-ent">&larr; Back</button>';
+    $("panel-content").style.display = "block"; $("panel-empty").style.display = "none";
+    var b = $("back-ent"); if (b) b.addEventListener("click", function () { selectNode(partId, { noFit: true }); });
+  }
+  async function showSimulate(partId) {
+    var alts = await mockApi.getAlternatives(partId, null);
+    var target = (alts.alternatives.find(function (a) { return a.qualifiedOnly; }) || alts.alternatives[0] || {}).supplierId;
+    if (!target) { toast("No candidate supplier to simulate."); return; }
+    var r = await mockApi.simulateResource(partId, target);
+    $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Re-source simulation";
+    $("panel-sub").textContent = r.part + " → " + r.to;
+    $("panel-content").innerHTML =
+      '<div class="kv"><span>From</span><span>' + (r.from || "—") + "</span></div>" +
+      '<div class="kv"><span>To</span><span>' + r.to + "</span></div>" +
+      '<div class="kv"><span>Removes SPOF</span><span>' + (r.removesSpof ? "Yes" : "No") + "</span></div>" +
+      '<div class="panel-section" style="margin-top:12px"><h3>Programs to re-validate</h3><p class="hint">' + (r.programsToRevalidate.join(", ") || "—") + "</p></div>" +
+      (r.newConcentrationCreated.length ? '<div class="lksg-flag">⚠ ' + r.note + "</div>" : '<p class="hint">' + r.note + "</p>") +
+      '<button type="button" class="pbtn ghost" id="back-ent">&larr; Back</button>';
+    var b = $("back-ent"); if (b) b.addEventListener("click", function () { selectNode(partId, { noFit: true }); });
+  }
+
+  /* ── Q2 concentration leaderboard ─────────────────────── */
+  async function showConcentration() {
+    var rows = await mockApi.getConcentration();
+    clearSelection();
+    $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Concentration leaderboard";
+    $("panel-sub").textContent = "If removed, programs that lose all routes (Q2)";
+    $("panel-content").innerHTML = rows.map(function (r, i) {
+      return '<div class="path-item" data-sid="' + r.supplierId + '"><strong>' + (i + 1) + ". " + r.name + " (T" + r.tier + ")</strong><div class=\"path-meta\">" + r.programsLostIfRemoved.length + " programs · " + (r.weightedVolume / 1000).toFixed(0) + "k weighted volume</div></div>";
+    }).join("");
+    $("panel-content").querySelectorAll(".path-item").forEach(function (el) { el.addEventListener("click", function () { selectNode(el.dataset.sid); }); });
+    setInfo("Concentration leaderboard — top exposure: " + (rows[0] ? rows[0].name : "—"));
+  }
+
+  /* ── Ownership overlay (Q4) ───────────────────────────── */
+  async function toggleOwnership(force) {
+    app.ownershipOn = force != null ? force : !app.ownershipOn;
+    $("btn-ownership").classList.toggle("active", app.ownershipOn);
+    if (app.layers.ownership) app.layers.ownership = app.ownershipOn;
+    if (app.ownershipOn) {
+      var existing = new Set(app.cy.nodes().map(function (n) { return n.id(); }));
+      ownershipElements().forEach(function (el) {
+        if (el.data.source) { if (!app.cy.getElementById(el.data.id).length) app.cy.add(el); }
+        else if (!existing.has(el.data.id)) app.cy.add(el);
+      });
+      app.cy.nodes().filter(function (n) { return n.data("ultimateParentId") === "parent_hongqiao" && n.data("type") === "supplier"; }).addClass("scenario-focus");
+      app.cy.getElementById("parent_hongqiao").addClass("scenario-focus");
+      if (app.layout === "dagre") runDagre(false);
+      showOwnershipPanel();
+    } else {
+      OWNERSHIP_TYPES.forEach(function (t) { app.cy.nodes('[type = "' + t + '"]').remove(); });
+      app.cy.edges().filter(function (e) { return e.data("layoutClass") === "ownership"; }).remove();
+      app.cy.nodes().removeClass("scenario-focus");
+      if (app.layout === "dagre") runDagre();
+      if (app.selection) selectNode(app.selection, { noFit: true }); else showPanelEmpty();
+    }
+    updateCounts();
+  }
+  async function showOwnershipPanel() {
+    var conc = await mockApi.getOwnerConcentration();
+    var vel = await mockApi.getOwnershipChain("t2_veldhoven");
+    $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Ownership concentration";
+    $("panel-sub").textContent = "European address ≠ independent control";
+    var html = '<div class="panel-section"><h3>Shared ultimate parent</h3>';
+    conc.forEach(function (row) {
+      html += '<div class="path-item"><strong style="color:var(--risk-critical)">' + row.ultimateParentName + (row.sanctioned ? " ⚠" : "") + "</strong><div class=\"path-meta\">" + row.suppliers.join(" + ") + "</div><div class=\"path-meta\">Affects: " + (row.combinedPrograms || []).slice(0, 4).join(", ") + "</div></div>";
+    });
+    html += '</div><div class="panel-section"><h3>Veldhoven chain</h3><div class="ownership-chain">';
+    vel.chain.filter(function (c) { return !c.edge; }).forEach(function (c) {
+      html += '<div class="entity' + (c.sanctionScreeningStatus === "sanctioned" ? " sanctioned" : "") + '">' + c.name + (c.country ? " · " + c.country : "") + "</div>";
+    });
+    html += "</div><p class=\"hint\" style=\"margin-top:10px\">" + (vel.dataFreshness || "") + "</p></div>";
+    $("panel-content").innerHTML = html;
+    setInfo("Two suppliers, one owner — Hongqiao Tech Holdings");
+  }
+
+  /* ── Scenarios ────────────────────────────────────────── */
+  async function runScenario(key) {
+    clearTraceClasses();
+    if (key === "c" && !app.ownershipOn) await toggleOwnership(true);
+    else if (key !== "c" && app.ownershipOn) await toggleOwnership(false);
+
+    if (key === "a") {
+      await selectNode("t2_siltech", { autoTrace: true });
+      $("breadcrumb").innerHTML = "Scenario A → SilTech Malaysia → Trace impact";
+    } else if (key === "b") {
+      await revealScenarioBConverge();
+    } else if (key === "c") {
+      await selectNode("t2_veldhoven", { noFit: true });
+      showOwnershipPanel();
+      $("breadcrumb").textContent = "Scenario C → Safe European supplier";
+      app.cy.fit(app.cy.nodes('[ultimateParentId = "parent_hongqiao"], #parent_hongqiao, #t2_veldhoven, #t2_siltech'), 80);
+    }
+    updateSpofBanner();
+  }
+
+  /* ── Scenario B reveal helpers (separate → converge) ──── */
+  function revealScenarioBSeparate() {
+    clearTraceClasses();
+    if (app.ownershipOn) toggleOwnership(false);
+    app.cy.nodes().addClass("trace-unaffected"); app.cy.edges().addClass("trace-dim");
+    ["part_brake_conti", "part_brake_bosch", "t1_continental", "t1_bosch", "asm_brake", "prog_golf", "prog_id4"].forEach(function (id) {
+      var el = app.cy.getElementById(id); if (el.length) el.removeClass("trace-unaffected").addClass("trace-affected");
+    });
+    app.cy.edges('[id = "e_conti_bc"], [id = "e_bosch_bb"], [id = "e_bc_brk"], [id = "e_bb_brk"]').removeClass("trace-dim").addClass("trace-path");
+    $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Dual-sourced — on paper";
+    $("panel-sub").textContent = "Two Tier-1s · two part numbers";
+    $("panel-content").innerHTML =
+      '<p style="font-size:12px;line-height:1.6">The Brake Safety Controller is approved from <strong>Continental</strong> and <strong>Bosch</strong> — two separate suppliers, two contracts, a green &ldquo;dual-sourced&rdquo; status.</p>' +
+      '<p class="hint" style="margin-top:10px">Two clean, independent branches. Now follow each one further upstream.</p>';
+    setInfo("Scenario B · two approved Tier-1 sources for the brake controller");
+    $("breadcrumb").textContent = "Scenario B → Redundancy that wasn't";
+    app.cy.fit(app.cy.elements(".trace-affected"), 80);
+  }
+  async function revealScenarioBConverge() {
+    var shared = await mockApi.getSharedDependencies(["prog_golf", "prog_id4"]);
+    clearTraceClasses();
+    app.cy.nodes().addClass("trace-unaffected"); app.cy.edges().addClass("trace-dim");
+    ["t3_paw", "part_paw_die", "part_brake_conti", "part_brake_bosch", "t1_continental", "t1_bosch", "prog_golf", "prog_id4"].forEach(function (id) {
+      var el = app.cy.getElementById(id);
+      if (el.length) el.removeClass("trace-unaffected").addClass((id === "t3_paw" || id === "part_paw_die") ? "convergence trace-affected" : "trace-affected");
+    });
+    app.cy.edges('[id = "e_die_bc"], [id = "e_die_bb"], [id = "e_paw_die"]').removeClass("trace-dim").addClass("convergence trace-path");
+    $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Hidden concentration";
+    $("panel-sub").textContent = "Dual-sourced at Tier-1 · single fab at Tier-3";
+    var headObj = shared.shared.filter(function (sx) { return sx.id === shared.headline; })[0] || shared.shared[0];
+    $("panel-content").innerHTML =
+      '<p style="font-size:12px;line-height:1.6;margin-bottom:14px">Brake Safety Controller is sourced from <strong>Continental</strong> and <strong>Bosch</strong> — but both dies are fabbed by <strong>' + (headObj ? headObj.name : "Pan-Asia Wafer") + "</strong>.</p>" +
+      '<div class="panel-section"><h3>Shared deep suppliers</h3>' + shared.shared.map(function (sx) { return '<div class="kv"><span>' + sx.name + "</span><span>Tier " + sx.tier + "</span></div>"; }).join("") + "</div>" +
+      '<p class="hint">Follow the orange convergence edges upstream from both controllers.</p>';
+    setInfo("Scenario B · " + shared.overlapCount + " shared deep suppliers · convergence at Pan-Asia Wafer");
+    app.cy.fit(app.cy.elements(".convergence, .trace-affected"), 80);
+    $("breadcrumb").textContent = "Scenario B → Redundancy that wasn't";
+  }
+
+  /* ── Guided scenario narration ────────────────────────── */
+  var SCENARIO_META = {
+    a: {
+      tag: "Scenario A", title: "One Chip, Two Platforms",
+      q: "If SilTech stops shipping, what production of ours stops — and when?",
+      why: "A no-name Tier-2 chip maker can silently halt finished cars. Not seeing these deep links is what made the 2021 chip crunch cost the industry roughly $210B.",
+      reveal: "Trace the chip's real part-by-part dependencies downstream and the graph lights up every program and plant it feeds — across the EV and combustion lines at once.",
+      aha: "One distressed supplier sits underneath both the future and the present of the product range."
+    },
+    b: {
+      tag: "Scenario B", title: "The Redundancy That Wasn't",
+      q: "We dual-sourced this safety controller across two suppliers — is that redundancy real?",
+      why: "\u201CDual-sourced\u201D on paper can still be a single factory deep down. The Renesas fab fire took out ~30% of the world's automotive chips from one building.",
+      reveal: "Trace both approved suppliers upstream and the two \u201Cindependent\u201D paths visibly converge on one shared foundry — Pan-Asia Wafer.",
+      aha: "Our backup and our primary are the same company one tier upstream."
+    },
+    c: {
+      tag: "Scenario C", title: "The Safe European Supplier",
+      q: "Our new European source is genuinely independent of the region we're leaving — right?",
+      why: "A European address is not European control. Nexperia (Dutch, Chinese-owned) became a supply crisis through its ownership structure alone — no factory failed.",
+      reveal: "Switch on the ownership overlay and both \u201Cindependent\u201D suppliers climb to the same ultimate parent — Hongqiao — one owner standing behind two addresses.",
+      aha: "We don't have two suppliers — we have one owner with two addresses."
+    }
+  };
+  var SCENARIO_STEPS = {
+    a: [
+      { head: "The alert fires", body: "A risk feed flags SilTech Malaysia — a Tier-2 chip maker — for a covenant breach. Purchasing has never heard of it: VW buys the finished part from Continental, so there's no SilTech contract in our systems. On a flat list it's just a red score with no obvious link to any car.", run: function () { clearTraceClasses(); if (app.ownershipOn) toggleOwnership(false); clearSelection(); app.cy.fit(undefined, 60); } },
+      { head: "Start at the true origin", body: "Selecting SilTech drops you at the real source of the risk, two tiers deep. The graph already holds what flows out of it — parts, assemblies, programs — so we can ask the question a table can't: what does this name actually touch?", run: function () { clearTraceClasses(); selectNode("t2_siltech", { noFit: false }); } },
+      { head: "Trace the blast radius", body: "Trace forward and the risk follows real dependencies, not guesses. It fans out at once into the EV line (ID.4, ID.7) and the combustion line (Golf, Tiguan) — two parts of the business everyone assumed were unrelated.", run: function () { runTrace("t2_siltech"); } },
+      { head: "Turn it into a number", body: "The inspector quantifies the exposure: programs and plants hit, revenue at risk, and — using days-of-supply — which line goes dark first. This is what turns \u201Ca chip vendor wobbled\u201D into \u201CZwickau stops in 9 days.\u201D", run: function () { if (!app.trace) runTrace("t2_siltech"); } },
+      { head: "The honest control case", body: "Not everything is red: the green DC-DC path stays genuinely dual-sourced (Infineon + Renesas — no shared fab, no shared owner). Keeping one honest green path proves the tool surfaces real risk rather than painting everything red for drama.", run: function () { if (!app.trace) runTrace("t2_siltech"); } }
+    ],
+    b: [
+      { head: "The question", body: "The brake safety controller was deliberately split across two Tier-1s — Continental and Bosch — so no single failure can stop the line. The whole point was resilience. So: is that redundancy actually real?", run: function () { revealScenarioBSeparate(); } },
+      { head: "Two paths, drawn separately", body: "On paper it's textbook: two approved vendors, two part numbers, two contracts — a green \u201Cdual-sourced\u201D status. Each controller traces upstream as its own clean, independent branch.", run: function () { revealScenarioBSeparate(); } },
+      { head: "Watch them converge", body: "Keep following both branches up the chain. One tier deeper than any contract reaches, they bend toward each other and meet at a single foundry — Pan-Asia Wafer — that fabs the die inside both controllers.", run: function () { revealScenarioBConverge(); } },
+      { head: "The redundancy that wasn't", body: "The two \u201Cindependent\u201D suppliers share one upstream factory, so a single fab outage takes out both at once. The graph makes a dependency that lived below our data visible — and it spans programs at more than one plant.", run: function () { revealScenarioBConverge(); } }
+    ],
+    c: [
+      { head: "A textbook de-risking move", body: "After the SilTech scare, purchasing qualifies a European alternative: Veldhoven Semiconductors. Every field a supplier table checks says safe — country Netherlands, EU region, low geo-risk — so the de-risking looks complete.", run: function () { clearTraceClasses(); if (app.ownershipOn) toggleOwnership(false); app.inspectorTab = "overview"; selectNode("t2_veldhoven", { noFit: false }); } },
+      { head: "Switch on the ownership overlay", body: "Ownership lives in a separate system and is normally never joined to part data. Turn the overlay on and the graph draws the control chain: lines climb from both Veldhoven and the Asian source SilTech, past intermediate holdings, upward.", run: async function () { if (!app.ownershipOn) await toggleOwnership(true); app.cy.fit(app.cy.nodes('[ultimateParentId = "parent_hongqiao"], #parent_hongqiao, #t2_veldhoven, #t2_siltech'), 80); } },
+      { head: "One owner, two addresses", body: "Both roll up to the same ultimate parent — Hongqiao Tech Holdings, entity-listed, in the very region VW was trying to leave. The diversification was an illusion: this time it isn't a shared factory, it's a shared owner.", run: async function () { if (!app.ownershipOn) await toggleOwnership(true); showOwnershipPanel(); app.cy.fit(app.cy.nodes('[ultimateParentId = "parent_hongqiao"], #parent_hongqiao, #t2_veldhoven, #t2_siltech'), 80); } }
+    ]
+  };
+
+  function startScenario(key) {
+    if (!SCENARIO_STEPS[key]) return;
+    closeWelcome();
+    endTour();
+    app.scenarioKey = key;
+    app.scenarioStep = 0;
+    $("scenario-coach").classList.add("show");
+    runScenarioStep(0);
+  }
+  function runScenarioStep(i) {
+    var steps = SCENARIO_STEPS[app.scenarioKey]; if (!steps) return;
+    i = Math.max(0, Math.min(i, steps.length - 1));
+    app.scenarioStep = i;
+    var step = steps[i];
+    if (step.run) { try { step.run(); } catch (e) { console.error(e); } }
+    renderScenarioCoach();
+  }
+  function renderScenarioCoach() {
+    var steps = SCENARIO_STEPS[app.scenarioKey]; if (!steps) return;
+    var i = app.scenarioStep, step = steps[i], meta = SCENARIO_META[app.scenarioKey];
+    $("sc-title").textContent = meta.tag + " · " + meta.title;
+    $("sc-step").textContent = "Step " + (i + 1) + " of " + steps.length;
+    $("sc-head").textContent = step.head;
+    $("sc-body").textContent = step.body;
+    $("sc-dots").innerHTML = steps.map(function (s, idx) { return '<span class="sc-dot' + (idx <= i ? " on" : "") + '"></span>'; }).join("");
+    $("sc-back").disabled = (i === 0);
+    $("sc-next").textContent = (i === steps.length - 1) ? "Done" : "Next";
+  }
+  function closeScenarioCoach() { $("scenario-coach").classList.remove("show"); app.scenarioKey = null; }
+
+  /* ── Welcome overlay ──────────────────────────────────── */
+  var WELCOME_KEY = "ge_welcome_dismissed";
+  function welcomeDismissed() { try { return !!localStorage.getItem(WELCOME_KEY); } catch (e) { return false; } }
+  function setWelcomeDismissed(on) { try { if (on) localStorage.setItem(WELCOME_KEY, "1"); else localStorage.removeItem(WELCOME_KEY); } catch (e) { /* ignore */ } }
+  function renderWelcomeCards() {
+    $("welcome-cards").innerHTML = ["a", "b", "c"].map(function (k) {
+      var m = SCENARIO_META[k];
+      return '<button type="button" class="wcard" data-scn="' + k + '">' +
+        '<span class="wtag">' + m.tag + "</span>" +
+        "<h3>" + m.title + "</h3>" +
+        '<div class="wq">&ldquo;' + m.q + '&rdquo;</div>' +
+        '<div class="wblock"><span class="wlabel">Why it matters</span>' + m.why + "</div>" +
+        '<div class="wblock"><span class="wlabel">How the graph reveals it</span>' + m.reveal + "</div>" +
+        '<div class="waha"><strong>The &ldquo;oh&rdquo;:</strong> ' + m.aha + "</div>" +
+        '<div class="wgo">Walk me through it →</div>' +
+        "</button>";
+    }).join("");
+    $("welcome-cards").querySelectorAll(".wcard").forEach(function (el) {
+      el.addEventListener("click", function () { startScenario(el.dataset.scn); });
+    });
+  }
+  function openWelcome() { renderWelcomeCards(); $("welcome-dismiss").checked = welcomeDismissed(); $("welcome-overlay").classList.add("show"); }
+  function closeWelcome() { $("welcome-overlay").classList.remove("show"); }
+
+  /* ── Interactive panel tour (coach marks) ─────────────── */
+  var TOUR_STEPS = [
+    { sel: "#toolbar", title: "Toolbar & global search", body: "Search any supplier, part or program by name, and reach the big actions — Concentration, Ownership, Views and Export — from here.", place: "bottom" },
+    { sel: "#filter-panel", title: "Filters & visibility layers", body: "Narrow the map by tier, risk, geography, program/plant or commodity, and switch on focus layers like ownership chains or financial-risk paths.", place: "right", before: function () { $("filter-panel").classList.remove("collapsed"); $("btn-filters").classList.add("active"); } },
+    { sel: "#scenario-bar", title: "The three guided scenarios", body: "Each button replays a story the connected map can answer but a table can't. Pick one and a step-by-step guide walks you through the reveal.", place: "bottom" },
+    { sel: "#cy", title: "The supply network map", body: "Every supplier, part, plant and program is a point; lines are the dependencies between them. Shape shows what an entity is; colour and glow show how risky it is.", place: "center" },
+    { sel: "#legend", title: "Reading the map", body: "The key decodes it: border colour is risk level (red = critical down to blue = low), and each shape is a different entity type.", place: "top" },
+    { sel: "#bottom-right", title: "Layout & zoom", body: "Switch between Hierarchy, Force and Geographic layouts, and zoom or fit the whole network to the screen.", place: "left" },
+    { sel: "#panel", title: "The inspector", body: "Selecting anything fills this panel: overview, supply path, ownership chain, risk signals and alert history. Tracing impact shows the blast radius and the revenue at risk.", place: "left" }
+  ];
+  function startTour() {
+    closeWelcome();
+    closeScenarioCoach();
+    app.tourStep = 0;
+    app._filterCollapsedBeforeTour = $("filter-panel").classList.contains("collapsed");
+    $("tour-layer").classList.add("show");
+    showTourStep(0);
+  }
+  function showTourStep(i) {
+    i = Math.max(0, Math.min(i, TOUR_STEPS.length - 1));
+    app.tourStep = i;
+    var step = TOUR_STEPS[i];
+    if (step.before) step.before();
+    $("tour-title").textContent = step.title;
+    $("tour-body").textContent = step.body;
+    $("tour-count").textContent = "Step " + (i + 1) + " of " + TOUR_STEPS.length;
+    $("tour-back").disabled = (i === 0);
+    $("tour-next").textContent = (i === TOUR_STEPS.length - 1) ? "Done" : "Next";
+    positionTour();
+    setTimeout(positionTour, 260);
+  }
+  function positionTour() {
+    if (!$("tour-layer").classList.contains("show")) return;
+    var step = TOUR_STEPS[app.tourStep]; if (!step) return;
+    var el = document.querySelector(step.sel); if (!el) return;
+    var r = el.getBoundingClientRect();
+    var sp = $("tour-spotlight"), tip = $("tour-tooltip");
+    var pad = 6;
+    sp.style.left = (r.left - pad) + "px";
+    sp.style.top = (r.top - pad) + "px";
+    sp.style.width = (r.width + pad * 2) + "px";
+    sp.style.height = (r.height + pad * 2) + "px";
+    var tw = tip.offsetWidth, th = tip.offsetHeight, gap = 16, m = 12;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var place = step.place || "bottom";
+    function fits(p) {
+      if (p === "right") return r.right + gap + tw <= vw - m;
+      if (p === "left") return r.left - gap - tw >= m;
+      if (p === "top") return r.top - gap - th >= m;
+      if (p === "bottom") return r.bottom + gap + th <= vh - m;
+      return true;
+    }
+    // If the preferred side would push the card off the page, flip to the opposite side.
+    var opposite = { right: "left", left: "right", top: "bottom", bottom: "top" };
+    if (place !== "center" && !fits(place) && fits(opposite[place])) place = opposite[place];
+    var left, top;
+    if (place === "center") { left = (vw - tw) / 2; top = Math.max(72, (vh - th) / 2 - 110); }
+    else if (place === "right") { left = r.right + gap; top = r.top; }
+    else if (place === "left") { left = r.left - tw - gap; top = r.top; }
+    else if (place === "top") { left = r.left; top = r.top - th - gap; }
+    else { left = r.left; top = r.bottom + gap; }
+    // For side placements (e.g. full-height filter/inspector panels) centre vertically on the target.
+    if (place === "right" || place === "left") top = r.top + (r.height - th) / 2;
+    left = Math.max(m, Math.min(left, vw - tw - m));
+    top = Math.max(m, Math.min(top, vh - th - m));
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function endTour() {
+    if (!$("tour-layer").classList.contains("show")) return;
+    $("tour-layer").classList.remove("show");
+    if (app._filterCollapsedBeforeTour) { $("filter-panel").classList.add("collapsed"); $("btn-filters").classList.remove("active"); }
+  }
+
+  /* ── Filters ──────────────────────────────────────────── */
+  function uniqueVals(key) { var s = new Set(); GRAPH.nodes.forEach(function (n) { if (n.data[key]) s.add(n.data[key]); }); return Array.from(s).sort(); }
+  function buildFilterPanel() {
+    var countries = uniqueVals("country");
+    var commodities = uniqueVals("commodity_group");
+    var programs = GRAPH.nodes.filter(function (n) { return n.data.type === "program"; });
+    var plants = GRAPH.nodes.filter(function (n) { return n.data.type === "plant"; });
+    function acc(title, body, open) { return '<div class="acc' + (open ? " open" : "") + '"><div class="acc-head">' + title + '<span class="chev">&#9656;</span></div><div class="acc-body">' + body + "</div></div>"; }
+    function chips(list, group) { return '<div class="chip-row">' + list.map(function (v) { return '<span class="fchip" data-group="' + group + '" data-val="' + v + '">' + (typeof v === "string" ? v.replace(/_/g, " ") : v) + "</span>"; }).join("") + "</div>"; }
+    var html = "";
+    html += acc("Supply-chain position", chips([1, 2, 3], "tiers"), true);
+    html += acc("Risk profile", chips(["critical", "high", "medium", "low"], "risk") + '<div style="margin-top:8px"></div>' + chips(["financial_insolvency", "geopolitical", "operational", "compliance", "concentration"], "riskType"), true);
+    html += acc("Geography", chips(countries, "country"));
+    html += acc("Program & plant", chips(programs.map(function (p) { return p.data.id; }).map(idToName), "program") + '<div style="margin-top:8px"></div>' + chips(plants.map(function (p) { return p.data.id; }).map(idToName), "plant"));
+    html += acc("Commodity", chips(commodities, "commodity"));
+    html += acc("Flags", '<label class="fchk"><input type="checkbox" id="f-spof"> SPOF only</label><label class="fchk"><input type="checkbox" id="f-lksg"> LkSG disclosure</label>', true);
+    html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin:14px 0 6px">Visibility layers</div>';
+    [["ownership", "Ownership chains"], ["financial", "Financial-risk paths"], ["tier3", "Tier-3 connections"], ["alternatives", "Alternative paths"], ["lksg", "LkSG flags"]].forEach(function (l) {
+      html += '<div class="layer-row"><span>' + l[1] + '</span><div class="switch" data-layer="' + l[0] + '"></div></div>';
+    });
+    $("filter-body").innerHTML = html;
+
+    $("filter-body").querySelectorAll(".acc-head").forEach(function (h) { h.addEventListener("click", function () { h.parentElement.classList.toggle("open"); }); });
+    $("filter-body").querySelectorAll(".fchip").forEach(function (c) {
+      c.addEventListener("click", function () {
+        var g = c.dataset.group, v = c.dataset.val;
+        var set = filterSetFor(g); var val = (g === "tiers") ? +v : v;
+        if (set.has(val)) set.delete(val); else set.add(val);
+        c.classList.toggle("on");
+        applyFilters();
+      });
+    });
+    $("f-spof").addEventListener("change", function (e) { app.filters.spofOnly = e.target.checked; applyFilters(); });
+    $("f-lksg").addEventListener("change", function (e) { app.filters.lksgOnly = e.target.checked; applyFilters(); });
+    $("filter-body").querySelectorAll(".switch").forEach(function (sw) { sw.addEventListener("click", function () { toggleLayer(sw.dataset.layer, sw); }); });
+  }
+  function idToName(id) { var n = GRAPH.nodes.find(function (x) { return x.data.id === id; }); return n ? n.data.name : id; }
+  function nameToNode(name) { return GRAPH.nodes.find(function (x) { return x.data.name === name; }); }
+  function filterSetFor(g) { return { tiers: app.filters.tiers, risk: app.filters.risk, riskType: app.filters.riskType, country: app.filters.country, program: app.filters.program, plant: app.filters.plant, commodity: app.filters.commodity }[g]; }
+
+  function applyFilters() {
+    var f = app.filters;
+    var anyName = function (set) { return set.size > 0; };
+    app.cy.nodes().forEach(function (n) {
+      if (OWNERSHIP_TYPES.has(n.data("type"))) return;
+      var d = n.data(), show = true;
+      if (f.tiers.size && d.type === "supplier" && !f.tiers.has(d.tier)) show = false;
+      if (f.risk.size && d.risk_level && !f.risk.has(d.risk_level)) show = false;
+      if (f.riskType.size && d.risk_type && !f.riskType.has(d.risk_type)) show = false;
+      if (f.country.size && d.country && !f.country.has(d.country)) show = false;
+      if (f.commodity.size && d.commodity_group && !f.commodity.has(d.commodity_group)) show = false;
+      if (f.spofOnly && !d.spof) show = false;
+      if (f.lksgOnly && !d.lksgDisclosureRequired) show = false;
+      if (f.program.size && (d.type === "program") && !f.program.has(d.name)) show = false;
+      if (f.plant.size && (d.type === "plant") && !f.plant.has(d.name)) show = false;
+      n.toggleClass("hidden", !show);
+    });
+    renderActiveChips();
+    updateCounts();
+    updateSpofBanner();
+    var visible = app.cy.nodes().not(".hidden").length;
+    if (visible === 0) setInfo("\u26A0 No results — adjust filters");
+  }
+  function renderActiveChips() {
+    var f = app.filters, chips = [];
+    f.tiers.forEach(function (v) { chips.push(["tiers", v, "Tier " + v]); });
+    f.risk.forEach(function (v) { chips.push(["risk", v, v]); });
+    f.riskType.forEach(function (v) { chips.push(["riskType", v, v.replace(/_/g, " ")]); });
+    f.country.forEach(function (v) { chips.push(["country", v, v]); });
+    f.commodity.forEach(function (v) { chips.push(["commodity", v, v.replace(/_/g, " ")]); });
+    f.program.forEach(function (v) { chips.push(["program", v, v]); });
+    f.plant.forEach(function (v) { chips.push(["plant", v, v]); });
+    if (f.spofOnly) chips.push(["spof", null, "SPOF only"]);
+    if (f.lksgOnly) chips.push(["lksg", null, "LkSG"]);
+    $("active-chips").innerHTML = chips.map(function (c) { return '<span class="active-chip" data-g="' + c[0] + '" data-v="' + (c[1] == null ? "" : c[1]) + '"><b>' + c[2] + "</b> ✕</span>"; }).join("");
+    $("active-chips").querySelectorAll(".active-chip").forEach(function (el) {
+      el.addEventListener("click", function () { removeFilter(el.dataset.g, el.dataset.v); });
+    });
+  }
+  function removeFilter(g, v) {
+    if (g === "spof") { app.filters.spofOnly = false; $("f-spof").checked = false; }
+    else if (g === "lksg") { app.filters.lksgOnly = false; $("f-lksg").checked = false; }
+    else { var set = filterSetFor(g); var val = (g === "tiers") ? +v : v; set.delete(val);
+      var chip = $("filter-body").querySelector('.fchip[data-group="' + g + '"][data-val="' + v + '"]'); if (chip) chip.classList.remove("on"); }
+    applyFilters();
+  }
+  function clearFilters() {
+    var f = app.filters;
+    [f.tiers, f.risk, f.riskType, f.country, f.program, f.plant, f.commodity].forEach(function (s) { s.clear(); });
+    f.spofOnly = false; f.lksgOnly = false;
+    $("filter-body").querySelectorAll(".fchip.on").forEach(function (c) { c.classList.remove("on"); });
+    var sp = $("f-spof"), lk = $("f-lksg"); if (sp) sp.checked = false; if (lk) lk.checked = false;
+    applyFilters();
+  }
+
+  /* ── Visibility layers ────────────────────────────────── */
+  function toggleLayer(name, sw) {
+    var on = !app.layers[name]; app.layers[name] = on; sw.classList.toggle("on", on);
+    if (name === "ownership") { toggleOwnership(on); return; }
+    app.cy.elements().removeClass("layer-hit");
+    // re-apply all active emphasis layers
+    Object.keys(app.layers).forEach(function (k) {
+      if (!app.layers[k] || k === "ownership") return;
+      if (k === "financial") app.cy.nodes('[risk_type = "financial_insolvency"]').addClass("layer-hit");
+      if (k === "tier3") app.cy.nodes('[tier = 3]').addClass("layer-hit");
+      if (k === "alternatives") app.cy.edges('[relationship = "QUALIFIED_FOR"]').addClass("layer-hit").connectedNodes().addClass("layer-hit");
+      if (k === "lksg") app.cy.nodes("[?lksgDisclosureRequired]").addClass("layer-hit");
+    });
+    var anyEmph = ["financial", "tier3", "alternatives", "lksg"].some(function (k) { return app.layers[k]; });
+    setInfo(anyEmph ? "Visibility layer active — highlighted entities emphasised" : "Layers cleared");
+  }
+
+  /* ── Node action bubble + context menu ────────────────── */
+  function showBubble(id) {
+    var d = app.cy.getElementById(id).data();
+    var bub = $("action-bubble");
+    var btns = [];
+    if (d.type === "supplier" || d.type === "part") btns.push('<button class="ab" data-act="trace">Trace</button>');
+    btns.push('<button class="ab" data-act="expand">Expand</button>');
+    if (d.ultimateParentId) btns.push('<button class="ab" data-act="own">Ownership</button>');
+    btns.push('<button class="ab" data-act="hide">Hide</button>');
+    bub.innerHTML = btns.join("");
+    bub.querySelectorAll(".ab").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var a = b.dataset.act;
+        if (a === "trace") runTrace(id);
+        else if (a === "expand") { app.cy.getElementById(id).neighborhood().removeClass("hidden dim"); updateCounts(); }
+        else if (a === "own") { toggleOwnership(true); }
+        else if (a === "hide") { app.cy.getElementById(id).addClass("hidden"); bub.classList.remove("show"); updateCounts(); }
+      });
+    });
+    bub.classList.add("show");
+    positionBubble();
+  }
+  function positionBubble() {
+    if (!app.selection) return;
+    var bub = $("action-bubble"); if (!bub.classList.contains("show")) return;
+    var n = app.cy.getElementById(app.selection); if (!n.length) { bub.classList.remove("show"); return; }
+    var p = n.renderedPosition(), h = n.renderedHeight();
+    bub.style.left = (p.x - bub.offsetWidth / 2) + "px";
+    bub.style.top = (p.y - h / 2 - 36) + "px";
+  }
+  function showCtx(id, rp) {
+    var d = app.cy.getElementById(id).data();
+    var m = $("ctx-menu");
+    var items = [['<div class="mi" data-a="trace">Trace from here</div>', "trace"], ['<div class="mi" data-a="own">Show ownership chain</div>', "own"], ['<div class="mi" data-a="360">Open Supplier 360</div>', "360"], ['<div class="mi" data-a="ack">Acknowledge alert</div>', "ack"], ['<div class="mi" data-a="hide">Hide</div>', "hide"]];
+    m.innerHTML = items.map(function (i) { return i[0]; }).join("");
+    m.style.left = rp.x + "px"; m.style.top = rp.y + "px"; m.classList.add("show");
+    m.querySelectorAll(".mi").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var a = el.dataset.a; hideCtx();
+        if (a === "trace") runTrace(id);
+        else if (a === "own") { toggleOwnership(true); app.inspectorTab = "ownership"; selectNode(id, { noFit: true }); }
+        else if (a === "360") toast("Supplier 360 — module coming soon");
+        else if (a === "ack") { ackForSupplier(id); }
+        else if (a === "hide") { app.cy.getElementById(id).addClass("hidden"); updateCounts(); }
+      });
+    });
+  }
+  function hideCtx() { $("ctx-menu").classList.remove("show"); }
+
+  /* ── Alerts ───────────────────────────────────────────── */
+  async function refreshAlerts() {
+    var r = await mockApi.getAlerts();
+    $("alert-count").textContent = r.count;
+    var body = $("alert-drawer-body");
+    body.innerHTML = r.alerts.map(function (a) {
+      return '<div class="alert-row ' + a.severity + (a.status === "acknowledged" ? " acked" : "") + '" data-id="' + a.id + '" data-supplier="' + a.supplierId + '"><strong>' + a.title + "</strong><div class=\"alert-time\">" + a.ts.replace("T", " ").slice(0, 16) + " · " + a.severity + (a.status === "acknowledged" ? " · ack " + (a.ackBy || "") : "") + "</div></div>";
+    }).join("");
+    body.querySelectorAll(".alert-row").forEach(function (row) {
+      row.addEventListener("click", function () { navigateToAlertEntity(row.dataset.supplier); });
+      row.addEventListener("contextmenu", function (e) { e.preventDefault(); mockApi.ackAlert(row.dataset.id, "demo user").then(refreshAlerts); });
+    });
+  }
+  function alertEntityType(sid) {
+    var g = GRAPH.nodes.find(function (x) { return x.data.id === sid; });
+    return g ? g.data.type : null;
+  }
+  async function navigateToAlertEntity(sid) {
+    $("alert-drawer").classList.remove("open");
+    var type = alertEntityType(sid);
+    // Ownership-only entities (ultimate parent / holding / sponsor) aren't in the
+    // default supply view — bring up the ownership overlay so navigation can resolve.
+    if (OWNERSHIP_TYPES.has(type) && !app.ownershipOn) await toggleOwnership(true);
+    var n = app.cy.getElementById(sid);
+    if (!n.length) { toast("Entity not in current view"); return; }
+    if (n.hasClass("hidden")) n.removeClass("hidden");   // reveal if hidden by an active filter
+    if (OWNERSHIP_TYPES.has(type)) { app.inspectorTab = "ownership"; selectNode(sid); }
+    else selectNode(sid, { autoTrace: sid === "t2_siltech" });
+  }
+  async function ackForSupplier(sid) {
+    var r = await mockApi.getAlerts();
+    var a = r.alerts.find(function (x) { return x.supplierId === sid && x.status === "active"; });
+    if (a) { await mockApi.ackAlert(a.id, "demo user"); refreshAlerts(); toast("Alert acknowledged (unresolved)"); }
+    else toast("No active alert for this entity");
+  }
+  function broadcast() {
+    $("alert-drawer").classList.add("open");
+    setInfo("\u26A1 Live signal incoming…");
+    var sil = app.cy.getElementById("t2_siltech");
+    sil.addClass("spof-flash");
+    setTimeout(function () { selectNode("t2_siltech", { noFit: true }); }, 1200);
+    setTimeout(function () { runTrace("t2_siltech"); toast("CRITICAL — SilTech covenant breach"); }, 2500);
+    setTimeout(function () { sil.removeClass("spof-flash"); }, 4000);
+  }
+
+  /* ── Search ───────────────────────────────────────────── */
+  function debounceSearch(q) {
+    clearTimeout(app.searchTimer);
+    app.searchTimer = setTimeout(async function () {
+      var box = $("search-results");
+      if (!q.trim()) { box.classList.remove("open"); box.innerHTML = ""; return; }
+      var res = await mockApi.search(q);
+      var html = "";
+      [["suppliers", "Suppliers"], ["parts", "Parts"], ["programs", "Programs"]].forEach(function (pair) {
+        var key = pair[0];
+        if (res[key] && res[key].length) {
+          html += '<div class="sr-group">' + pair[1] + "</div>";
+          res[key].forEach(function (item) { html += '<div class="sr-item" data-id="' + item.id + '"><div>' + item.name + '</div><div class="sr-meta">' + (item.tier ? "Tier " + item.tier + " · " : "") + (item.country || item.part_number || "") + "</div></div>"; });
+        }
+      });
+      if (res.suggestion) html += '<div class="sr-group">Did you mean</div><div class="sr-item" data-suggest="' + res.suggestion + '">' + res.suggestion + "</div>";
+      box.innerHTML = html || '<div class="sr-item" style="color:var(--text-muted)">No results</div>';
+      box.classList.add("open");
+      box.querySelectorAll(".sr-item[data-id]").forEach(function (el) {
+        el.addEventListener("click", function () { box.classList.remove("open"); $("search").value = ""; focusSearch(el.dataset.id); });
+      });
+    }, 200);
+  }
+  function focusSearch(id) {
+    app.cy.nodes().removeClass("search-hit");
+    var hit = app.cy.getElementById(id);
+    if (hit.length) { hit.addClass("search-hit"); selectNode(id); app.cy.animate({ fit: { eles: hit, padding: 110 } }, { duration: 400 }); }
+  }
+
+  /* ── Saved views (Q · FR-13) ──────────────────────────── */
+  function buildViewsMenu() {
+    var mine = [];
+    try { mine = JSON.parse(localStorage.getItem("ge_my_views") || "[]"); } catch (e) { mine = []; }
+    var system = (typeof SYSTEM_VIEWS !== "undefined" && SYSTEM_VIEWS) ? SYSTEM_VIEWS : (window.SYSTEM_VIEWS || []);
+    var html = "";
+    html += '<div class="mi" data-view="__save"><span class="mi-name">Save current view…</span><small>Stored in this browser</small></div><div class="menu-sep"></div>';
+    html += '<div class="menu-label">System views</div>';
+    system.forEach(function (s) { html += '<div class="mi" data-view="sys:' + s.id + '"><span class="mi-name">' + s.name + '</span><small>System view</small></div>'; });
+    if (mine.length) { html += '<div class="menu-sep"></div><div class="menu-label">My views</div>'; mine.forEach(function (s) { html += '<div class="mi" data-view="my:' + s.id + '"><span class="mi-name">' + s.name + '</span><small>My view</small></div>'; }); }
+    $("views-menu").innerHTML = html;
+    $("views-menu").querySelectorAll(".mi").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        $("views-menu").classList.remove("open");
+        var val = el.dataset.view;
+        if (val === "__save") saveCurrentView();
+        else if (val.indexOf("sys:") === 0) applySystemView(system.find(function (s) { return s.id === val.slice(4); }));
+        else applySystemView(mine.find(function (s) { return s.id === val.slice(3); }));
+      });
+    });
+  }
+  function applySystemView(view) {
+    if (!view) return;
+    clearFilters();
+    var fl = view.filters || {};
+    if (fl.risk_level) fl.risk_level.forEach(function (r) { app.filters.risk.add(r); markChip("risk", r); });
+    if (fl.risk_type) fl.risk_type.forEach(function (r) { app.filters.riskType.add(r); markChip("riskType", r); });
+    if (fl.country) fl.country.forEach(function (r) { app.filters.country.add(r); markChip("country", r); });
+    if (fl.commodity) fl.commodity.forEach(function (r) { app.filters.commodity.add(r); markChip("commodity", r); });
+    if (fl.program) fl.program.forEach(function (id) { var nm = idToName(id); app.filters.program.add(nm); markChip("program", nm); });
+    if (fl.plant) fl.plant.forEach(function (id) { var nm = idToName(id); app.filters.plant.add(nm); markChip("plant", nm); });
+    if (fl.spof_only) { app.filters.spofOnly = true; var sp = $("f-spof"); if (sp) sp.checked = true; }
+    if (fl.lksg) { app.filters.lksgOnly = true; var lk = $("f-lksg"); if (lk) lk.checked = true; }
+    if (view.layers && view.layers.ownership && !app.ownershipOn) toggleOwnership(true);
+    applyFilters();
+    // Keep the view's focus visible even if the view's own filters would hide it,
+    // so applying a view never lands the user on an empty/near-empty canvas.
+    var fn = view.focus ? app.cy.getElementById(view.focus) : null;
+    if (fn && fn.length && fn.hasClass("hidden")) { fn.removeClass("hidden"); updateCounts(); }
+    var vis = app.cy.nodes().not(".hidden");
+    if (vis.length) app.cy.fit(vis, 60);
+    if (fn && fn.length) selectNode(view.focus, { noFit: true });
+    toast("Applied view: " + view.name);
+  }
+  function markChip(group, val) { var c = $("filter-body").querySelector('.fchip[data-group="' + group + '"][data-val="' + val + '"]'); if (c) c.classList.add("on"); }
+  async function saveCurrentView() {
+    var name = prompt("Name this view:", "My view " + new Date().toLocaleDateString());
+    if (!name) return;
+    var f = app.filters;
+    await mockApi.saveView({ name: name, filters: { risk_level: Array.from(f.risk), risk_type: Array.from(f.riskType), country: Array.from(f.country), commodity: Array.from(f.commodity), spof_only: f.spofOnly, lksg: f.lksgOnly }, layers: { ownership: app.ownershipOn }, focus: app.selection });
+    toast("View saved"); buildViewsMenu();
+  }
+
+  /* ── Deep link / hash ─────────────────────────────────── */
+  function writeHash() {
+    var f = app.filters;
+    var state = { sel: app.selection, own: app.ownershipOn, layout: app.layout, risk: Array.from(f.risk), tier: Array.from(f.tiers) };
+    location.hash = "s=" + encodeURIComponent(JSON.stringify(state));
+  }
+  function readHash() {
+    if (!location.hash || location.hash.indexOf("s=") < 0) return;
+    try {
+      var state = JSON.parse(decodeURIComponent(location.hash.split("s=")[1]));
+      if (state.own) toggleOwnership(true);
+      if (state.layout && state.layout !== "dagre") applyLayout(state.layout, false);
+      (state.risk || []).forEach(function (r) { app.filters.risk.add(r); markChip("risk", r); });
+      (state.tier || []).forEach(function (t) { app.filters.tiers.add(t); markChip("tiers", t); });
+      applyFilters();
+      if (state.sel && app.cy.getElementById(state.sel).length) setTimeout(function () { selectNode(state.sel); }, 300);
+    } catch (e) { /* ignore */ }
+  }
+
+  /* ── Export / present ─────────────────────────────────── */
+  function exportPng() {
+    try { var png = app.cy.png({ full: true, scale: 2, bg: "#ffffff" }); var a = document.createElement("a"); a.href = png; a.download = "graph-explorer.png"; a.click(); toast("PNG downloaded"); }
+    catch (e) { toast("Export failed: " + e.message); }
+  }
+  function copyLink() { writeHash(); var url = location.href; if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast("Share link copied"); }, function () { toast(url); }); else toast(url); }
+  function togglePresent() {
+    app.present = !app.present;
+    document.querySelectorAll("#scenario-bar, #legend, #bottom-right, #spof-banner, #active-chips, #scenario-coach").forEach(function (el) { el.style.visibility = app.present ? "hidden" : ""; });
+    toast(app.present ? "Present mode — Esc to exit" : "Present mode off");
+  }
+
+  /* ── Wire up controls ─────────────────────────────────── */
+  $("btn-trace").addEventListener("click", function () { if (app.selection) runTrace(app.selection); });
+  $("btn-clear-trace").addEventListener("click", clearTraceFull);
+  $("btn-ownership").addEventListener("click", function () { toggleOwnership(); });
+  $("btn-concentration").addEventListener("click", showConcentration);
+  $("btn-alerts").addEventListener("click", function () { $("alert-drawer").classList.add("open"); });
+  $("btn-close-alerts").addEventListener("click", function () { $("alert-drawer").classList.remove("open"); });
+  $("btn-broadcast").addEventListener("click", broadcast);
+  $("btn-filters").addEventListener("click", function () { $("filter-panel").classList.toggle("collapsed"); $("btn-filters").classList.toggle("active", !$("filter-panel").classList.contains("collapsed")); });
+  $("filter-toggle-tab").addEventListener("click", function () { $("filter-panel").classList.remove("collapsed"); $("btn-filters").classList.add("active"); });
+  $("filter-clear").addEventListener("click", clearFilters);
+  $("spof-highlight").addEventListener("click", function () { var spof = app.cy.nodes("[?spof]").not(".hidden"); spof.addClass("spof-flash"); setTimeout(function () { spof.removeClass("spof-flash"); }, 1800); app.cy.fit(spof, 80); });
+  $("zoom-in").addEventListener("click", function () { app.cy.zoom(app.cy.zoom() * 1.2); });
+  $("zoom-out").addEventListener("click", function () { app.cy.zoom(app.cy.zoom() / 1.2); });
+  $("zoom-fit").addEventListener("click", function () { app.cy.fit(undefined, 60); });
+  document.querySelectorAll("#layout-switch button").forEach(function (b) { b.addEventListener("click", function () { applyLayout(b.dataset.layout); }); });
+  document.querySelectorAll(".scenario-btn").forEach(function (b) { b.addEventListener("click", function () { startScenario(b.dataset.scenario); }); });
+  $("search").addEventListener("input", function (e) { debounceSearch(e.target.value); });
+
+  $("btn-guide").addEventListener("click", openWelcome);
+  $("welcome-explore").addEventListener("click", function () { setWelcomeDismissed($("welcome-dismiss").checked); closeWelcome(); });
+  $("welcome-tour").addEventListener("click", function () { setWelcomeDismissed($("welcome-dismiss").checked); startTour(); });
+  $("welcome-dismiss").addEventListener("change", function (e) { setWelcomeDismissed(e.target.checked); });
+  $("welcome-overlay").addEventListener("click", function (e) { if (e.target === $("welcome-overlay")) closeWelcome(); });
+  $("tour-next").addEventListener("click", function () { if (app.tourStep >= TOUR_STEPS.length - 1) endTour(); else showTourStep(app.tourStep + 1); });
+  $("tour-back").addEventListener("click", function () { showTourStep(app.tourStep - 1); });
+  $("sc-next").addEventListener("click", function () { var steps = SCENARIO_STEPS[app.scenarioKey]; if (!steps) return; if (app.scenarioStep >= steps.length - 1) closeScenarioCoach(); else runScenarioStep(app.scenarioStep + 1); });
+  $("sc-back").addEventListener("click", function () { runScenarioStep(app.scenarioStep - 1); });
+  $("sc-close").addEventListener("click", closeScenarioCoach);
+  window.addEventListener("resize", positionTour);
+
+  $("btn-views").addEventListener("click", function (e) {
+    e.stopPropagation();
+    $("export-menu").classList.remove("open");
+    var willOpen = !$("views-menu").classList.contains("open");
+    buildViewsMenu();
+    $("views-menu").classList.toggle("open", willOpen);
+  });
+  $("btn-export").addEventListener("click", function (e) { e.stopPropagation(); $("export-menu").classList.toggle("open"); $("views-menu").classList.remove("open"); });
+  $("export-menu").querySelectorAll(".mi").forEach(function (el) { el.addEventListener("click", function () { $("export-menu").classList.remove("open"); var a = el.dataset.export; if (a === "png") exportPng(); else if (a === "link") copyLink(); else togglePresent(); }); });
+  document.addEventListener("click", function () { $("views-menu").classList.remove("open"); $("export-menu").classList.remove("open"); hideCtx(); });
+
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); $("search").focus(); }
+    if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("search").focus(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); $("btn-filters").click(); }
+    if (e.shiftKey && (e.key === "D" || e.key === "d")) { e.preventDefault(); broadcast(); }
+    if (e.key === "Escape") {
+      if ($("tour-layer").classList.contains("show")) { endTour(); return; }
+      if ($("welcome-overlay").classList.contains("show")) { closeWelcome(); return; }
+      if (app.present) { togglePresent(); return; }
+      if ($("scenario-coach").classList.contains("show")) { closeScenarioCoach(); }
+      clearTraceFull();
+      $("alert-drawer").classList.remove("open");
+      $("search-results").classList.remove("open");
+      hideCtx();
+    }
+    if (e.key === "f" && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== "INPUT") app.cy.fit(undefined, 60);
+  });
+
+  /* ── Boot ─────────────────────────────────────────────── */
+  function boot() {
+    var loader = $("loading");
+    if (typeof cytoscape === "undefined") { loader.textContent = "Failed to load Cytoscape (CDN). Check your network and reload."; return; }
+    if (typeof GRAPH === "undefined" || typeof mockApi === "undefined") { loader.textContent = "Failed to load graph-explorer-data.js / graph-explorer-mock-api.js (must sit next to index.html)."; return; }
+    var hasDagre = false;
+    try { cytoscape({ headless: true }).layout({ name: "dagre" }); hasDagre = true; } catch (e) { hasDagre = false; }
+    if (!hasDagre) { loader.textContent = "dagre layout failed to load (cytoscape-dagre CDN blocked). Check network and reload."; return; }
+    try { initCy(); refreshAlerts(); if (!welcomeDismissed()) openWelcome(); }
+    catch (err) { loader.classList.remove("hidden"); loader.textContent = "Init error: " + (err && err.message ? err.message : err); console.error(err); }
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

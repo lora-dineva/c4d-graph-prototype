@@ -97,14 +97,17 @@ button { font-family: inherit; }
 
 .menu-wrap { position: relative; }
 .menu-pop {
-  position: absolute; top: calc(100% + 6px); right: 0; min-width: 230px;
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 248px; max-width: 320px;
+  max-height: min(72vh, 460px); overflow-y: auto;
   background: var(--surface); color: var(--text-primary); border: 1px solid var(--panel-border);
   border-radius: 8px; box-shadow: var(--shadow); padding: 6px; display: none; z-index: 450;
 }
 .menu-pop.open { display: block; }
 .menu-pop .mi { padding: 8px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
 .menu-pop .mi:hover { background: var(--surface-alt); }
-.menu-pop .mi small { display: block; color: var(--text-muted); font-size: 10px; }
+.menu-pop .mi .mi-name { display: block; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+.menu-pop .mi small { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
+.menu-pop .menu-label { font-size: 9px; text-transform: uppercase; letter-spacing: .7px; color: var(--text-muted); padding: 7px 10px 3px; }
 .menu-sep { height: 1px; background: var(--hairline); margin: 5px 2px; }
 
 /* ── Main layout ─────────────────────────────────────────── */
@@ -287,6 +290,66 @@ button { font-family: inherit; }
 #loading.hidden { display: none; }
 
 #present-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 500; display: none; }
+
+/* ── Welcome overlay ─────────────────────────────────────── */
+#welcome-overlay { position: fixed; inset: 0; z-index: 700; background: rgba(0,30,80,.55); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 24px; }
+#welcome-overlay.show { display: flex; }
+.welcome-card { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); max-width: 960px; width: 100%; max-height: 92vh; overflow-y: auto; }
+.welcome-head { background: var(--brand-dark); color: #fff; padding: 22px 28px; }
+.welcome-head h2 { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
+.welcome-head p { font-size: 13px; color: #aee6ff; margin-top: 7px; line-height: 1.55; max-width: 720px; }
+.welcome-body { padding: 22px 28px 26px; }
+.welcome-body .wsub { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--text-muted); margin-bottom: 12px; }
+.scenario-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.wcard { text-align: left; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; cursor: pointer; background: var(--surface-alt); transition: border-color .15s, transform .15s, box-shadow .15s; display: flex; flex-direction: column; font: inherit; }
+.wcard:hover { border-color: var(--brand-teal); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.wcard .wtag { font-size: 10px; font-weight: 700; color: var(--brand-teal-ink); letter-spacing: .5px; text-transform: uppercase; }
+.wcard h3 { font-size: 14px; color: var(--brand-dark); margin: 6px 0 9px; line-height: 1.25; }
+.wcard .wq { font-size: 11px; font-style: italic; color: var(--text-primary); margin-bottom: 9px; line-height: 1.45; }
+.wcard .wfail { font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.wcard .wblock { font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.wcard .wlabel { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--brand-teal-ink); font-weight: 700; margin-bottom: 3px; }
+.wcard .waha { font-size: 11px; color: #8a4b00; background: #fff3e6; border: 1px solid #ffe0bd; border-radius: 6px; padding: 8px 9px; line-height: 1.45; margin-top: auto; }
+.wcard .wgo { margin-top: 11px; font-size: 11px; font-weight: 700; color: var(--brand-teal-ink); }
+.welcome-actions { display: flex; align-items: center; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+.welcome-actions .spacer { flex: 1; }
+.wbtn { border: none; border-radius: 8px; padding: 10px 18px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.wbtn.primary { background: var(--brand-teal); color: var(--brand-dark); }
+.wbtn.ghost { background: var(--surface-alt); color: var(--text-primary); border: 1px solid var(--panel-border); }
+.wbtn:hover { filter: brightness(1.04); }
+.wcheck { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.wcheck input { accent-color: var(--brand-teal); }
+
+/* ── Coach-mark tour ─────────────────────────────────────── */
+#tour-layer { position: fixed; inset: 0; z-index: 720; display: none; }
+#tour-layer.show { display: block; }
+#tour-spotlight { position: absolute; border-radius: 10px; box-shadow: 0 0 0 3px var(--brand-teal), 0 0 0 9999px rgba(0,30,80,.55); transition: all .25s ease; pointer-events: none; }
+#tour-tooltip { position: absolute; width: 288px; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow); padding: 16px; transition: top .25s ease, left .25s ease; }
+#tour-tooltip h4 { font-size: 13px; color: var(--brand-dark); margin-bottom: 6px; }
+#tour-tooltip p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.tour-foot { display: flex; align-items: center; margin-top: 14px; gap: 8px; }
+.tour-count { font-size: 11px; color: var(--text-muted); }
+.tour-foot .spacer { flex: 1; }
+.tbtn-sm { border: none; border-radius: 7px; padding: 7px 13px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.tbtn-sm.primary { background: var(--brand-teal); color: var(--brand-dark); }
+.tbtn-sm.ghost { background: var(--surface-alt); color: var(--text-primary); border: 1px solid var(--panel-border); }
+.tbtn-sm:disabled { opacity: .4; cursor: default; }
+
+/* ── Scenario narration coach ────────────────────────────── */
+#scenario-coach { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); z-index: 140; width: 468px; max-width: 80%; background: var(--surface); border: 1px solid var(--panel-border); border-top: 3px solid var(--brand-teal); border-radius: 12px; box-shadow: var(--shadow); padding: 14px 16px; display: none; }
+#scenario-coach.show { display: block; }
+.sc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.sc-title { font-size: 13px; font-weight: 700; color: var(--brand-dark); }
+.sc-step { font-size: 10px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+.sc-close { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 2px; }
+.sc-close:hover { color: var(--text-primary); }
+.sc-head { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.sc-body { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.sc-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.sc-foot .spacer { flex: 1; }
+.sc-dots { display: flex; gap: 5px; align-items: center; }
+.sc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--panel-border); }
+.sc-dot.on { background: var(--brand-teal); }
 </style>
 </head>
 <body>
@@ -295,6 +358,7 @@ button { font-family: inherit; }
     <h1>N-TIER SUPPLIER MONITOR</h1>
     <span class="badge">GRAPH EXPLORER</span>
     <button type="button" class="tbtn" id="btn-filters" title="Toggle filters (Ctrl+F)">Filters</button>
+    <button type="button" class="tbtn" id="btn-guide" title="Demo guide & walkthrough">Guide</button>
     <div class="toolbar-spacer"></div>
     <div id="search-wrap">
       <span class="search-icon">&#128269;</span>
@@ -366,6 +430,22 @@ button { font-family: inherit; }
         </div>
       </div>
 
+      <div id="scenario-coach">
+        <div class="sc-top">
+          <span class="sc-title" id="sc-title"></span>
+          <span class="sc-step" id="sc-step"></span>
+          <button type="button" class="sc-close" id="sc-close" title="Close walkthrough">&times;</button>
+        </div>
+        <div class="sc-head" id="sc-head"></div>
+        <div class="sc-body" id="sc-body"></div>
+        <div class="sc-foot">
+          <div class="sc-dots" id="sc-dots"></div>
+          <span class="spacer"></span>
+          <button type="button" class="tbtn-sm ghost" id="sc-back">Back</button>
+          <button type="button" class="tbtn-sm primary" id="sc-next">Next</button>
+        </div>
+      </div>
+
       <div id="info-strip"><span id="info-text">Click a supplier · Trace impact · Toggle ownership · Esc clears</span><span id="info-count"></span></div>
     </div>
 
@@ -382,10 +462,47 @@ button { font-family: inherit; }
         <div id="panel-tabs" style="display:none"></div>
       </div>
       <div id="panel-body">
-        <div class="empty-state" id="panel-empty">Use the scenario buttons up top, search for <strong>SilTech</strong>, or click any supplier on the map to inspect its risk profile and trace its blast radius.</div>
+        <div class="empty-state" id="panel-empty"><p style="margin-bottom:10px">This panel is your detail view. Whatever you select on the map is explained here &mdash; its risk profile, what it supplies, who owns it, and what it would take down if it failed.</p><p style="margin-bottom:10px"><strong>New here?</strong> The fastest way in is a guided scenario: click <strong>Guide</strong> in the top bar, or one of the three scenario cards above the map.</p><p>Otherwise, search for <strong>SilTech</strong> or click any supplier on the map, then use <strong>Trace impact</strong> to see its blast radius &mdash; every part, plant and vehicle programme it reaches.</p></div>
         <div id="panel-content" style="display:none"></div>
       </div>
     </aside>
+  </div>
+</div>
+
+<div id="welcome-overlay">
+  <div class="welcome-card">
+    <div class="welcome-head">
+      <h2>N-tier Supplier Monitor &mdash; Graph Explorer</h2>
+      <p>This is the supply chain your spreadsheets can't see. Most supplier systems list who you buy from directly &mdash; your Tier-1s. They go quiet about who supplies <em>them</em>, and who supplies <em>them</em>. That is exactly where the disruptions of the last five years started: a distressed chip maker two tiers down, a &ldquo;backup&rdquo; supplier that shares one factory with your primary, a &ldquo;European&rdquo; source quietly controlled from the region you were trying to leave.</p>
+      <p>The Graph Explorer joins your part, plant, programme, ownership and risk data into one connected map, so a risk landing anywhere in the chain can be followed all the way to the cars and plants it threatens &mdash; in seconds, not a six-week manual study. Pick a scenario below to be walked through a real example, or take a quick tour of the workspace first.</p>
+    </div>
+    <div class="welcome-body">
+      <div class="wsub">How to read the map</div>
+      <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px">Each point is one thing in the chain &mdash; a supplier, a site, a part, an assembly, a plant or a vehicle programme. Its <strong>shape</strong> tells you what type it is (see the key, bottom-left). Its <strong>border colour</strong> tells you how exposed it is: red critical, orange high, amber medium, blue low, green a genuinely healthy path. Lines are real dependencies &mdash; what flows into what. A double ring marks a single point of failure: a part with no alternative route.</p>
+      <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:18px">Click anything to inspect it on the right. Use <strong>Trace impact</strong> on a supplier or part to light up everything downstream it would take with it. The three scenarios below show the patterns a flat list can never reveal.</p>
+      <div class="wsub">Guided scenarios &mdash; click one to start</div>
+      <div class="scenario-cards" id="welcome-cards"></div>
+      <div class="welcome-actions">
+        <label class="wcheck"><input type="checkbox" id="welcome-dismiss"> Don't show this on load again</label>
+        <div class="spacer"></div>
+        <button type="button" class="wbtn ghost" id="welcome-explore">Explore on my own</button>
+        <button type="button" class="wbtn primary" id="welcome-tour">Take the panel tour</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tour-layer">
+  <div id="tour-spotlight"></div>
+  <div id="tour-tooltip">
+    <h4 id="tour-title"></h4>
+    <p id="tour-body"></p>
+    <div class="tour-foot">
+      <span class="tour-count" id="tour-count"></span>
+      <span class="spacer"></span>
+      <button type="button" class="tbtn-sm ghost" id="tour-back">Back</button>
+      <button type="button" class="tbtn-sm primary" id="tour-next">Next</button>
+    </div>
   </div>
 </div>
 
@@ -689,6 +806,7 @@ button { font-family: inherit; }
         if (kv[1] != null) html += '<div class="kv"><span>' + kv[0] + "</span><span>" + kv[1] + "</span></div>";
       });
       html += "</div>";
+      if (d.type === "supplier" || d.type === "part") html += '<p class="hint" style="margin-bottom:8px">Trace impact follows this entity downstream and lights up every part, plant and vehicle programme that depends on it \u2014 its blast radius if it failed.</p>';
       if (d.type === "supplier" || d.type === "part") html += '<button type="button" class="pbtn" id="ip-trace">Trace impact &rarr;</button>';
       if (d.type === "part") html += '<button type="button" class="pbtn ghost" id="ip-alt">Find alternatives</button><button type="button" class="pbtn ghost" id="ip-sim">Simulate re-source</button>';
       html += '<button type="button" class="pbtn ghost" id="ip-360">Open Supplier 360</button>';
@@ -775,6 +893,7 @@ button { font-family: inherit; }
     }).join("");
 
     $("panel-content").innerHTML =
+      '<p class="hint" style="margin-bottom:12px">Everything below is the downstream blast radius of <strong>' + result.source.name + '</strong>: what stops, how much it is worth, and how soon. Each row in the path index is one route from this risk to a vehicle programme \u2014 click a route to highlight it on the map.</p>' +
       '<div class="stat-grid panel-section">' +
       '<div class="stat"><div class="val critical" id="odo">€0</div><div class="lbl">Revenue at risk</div></div>' +
       '<div class="stat"><div class="val">' + progCount + '</div><div class="lbl">Programs affected</div></div>' +
@@ -931,25 +1050,7 @@ button { font-family: inherit; }
       await selectNode("t2_siltech", { autoTrace: true });
       $("breadcrumb").innerHTML = "Scenario A → SilTech Malaysia → Trace impact";
     } else if (key === "b") {
-      var shared = await mockApi.getSharedDependencies(["prog_golf", "prog_id4"]);
-      clearTraceClasses();
-      app.cy.nodes().addClass("trace-unaffected"); app.cy.edges().addClass("trace-dim");
-      ["t3_paw", "part_paw_die", "part_brake_conti", "part_brake_bosch", "t1_continental", "t1_bosch", "prog_golf", "prog_id4"].forEach(function (id) {
-        var el = app.cy.getElementById(id);
-        if (el.length) el.removeClass("trace-unaffected").addClass((id === "t3_paw" || id === "part_paw_die") ? "convergence trace-affected" : "trace-affected");
-      });
-      app.cy.edges('[id = "e_die_bc"], [id = "e_die_bb"], [id = "e_paw_die"]').removeClass("trace-dim").addClass("convergence trace-path");
-      $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
-      $("panel-title").textContent = "Hidden concentration";
-      $("panel-sub").textContent = "Dual-sourced at Tier-1 · single fab at Tier-3";
-      var headObj = shared.shared.filter(function (sx) { return sx.id === shared.headline; })[0] || shared.shared[0];
-      $("panel-content").innerHTML =
-        '<p style="font-size:12px;line-height:1.6;margin-bottom:14px">Brake Safety Controller is sourced from <strong>Continental</strong> and <strong>Bosch</strong> — but both dies are fabbed by <strong>' + (headObj ? headObj.name : "Pan-Asia Wafer") + "</strong>.</p>" +
-        '<div class="panel-section"><h3>Shared deep suppliers</h3>' + shared.shared.map(function (sx) { return '<div class="kv"><span>' + sx.name + "</span><span>Tier " + sx.tier + "</span></div>"; }).join("") + "</div>" +
-        '<p class="hint">Follow the orange convergence edges upstream from both controllers.</p>';
-      setInfo("Scenario B · " + shared.overlapCount + " shared deep suppliers · convergence at Pan-Asia Wafer");
-      app.cy.fit(app.cy.elements(".convergence, .trace-affected"), 80);
-      $("breadcrumb").textContent = "Scenario B → Redundancy that wasn't";
+      await revealScenarioBConverge();
     } else if (key === "c") {
       await selectNode("t2_veldhoven", { noFit: true });
       showOwnershipPanel();
@@ -957,6 +1058,220 @@ button { font-family: inherit; }
       app.cy.fit(app.cy.nodes('[ultimateParentId = "parent_hongqiao"], #parent_hongqiao, #t2_veldhoven, #t2_siltech'), 80);
     }
     updateSpofBanner();
+  }
+
+  /* ── Scenario B reveal helpers (separate → converge) ──── */
+  function revealScenarioBSeparate() {
+    clearTraceClasses();
+    if (app.ownershipOn) toggleOwnership(false);
+    app.cy.nodes().addClass("trace-unaffected"); app.cy.edges().addClass("trace-dim");
+    ["part_brake_conti", "part_brake_bosch", "t1_continental", "t1_bosch", "asm_brake", "prog_golf", "prog_id4"].forEach(function (id) {
+      var el = app.cy.getElementById(id); if (el.length) el.removeClass("trace-unaffected").addClass("trace-affected");
+    });
+    app.cy.edges('[id = "e_conti_bc"], [id = "e_bosch_bb"], [id = "e_bc_brk"], [id = "e_bb_brk"]').removeClass("trace-dim").addClass("trace-path");
+    $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Dual-sourced — on paper";
+    $("panel-sub").textContent = "Two Tier-1s · two part numbers";
+    $("panel-content").innerHTML =
+      '<p style="font-size:12px;line-height:1.6">The Brake Safety Controller is approved from <strong>Continental</strong> and <strong>Bosch</strong> — two separate suppliers, two contracts, a green &ldquo;dual-sourced&rdquo; status.</p>' +
+      '<p class="hint" style="margin-top:10px">Two clean, independent branches. Now follow each one further upstream.</p>';
+    setInfo("Scenario B · two approved Tier-1 sources for the brake controller");
+    $("breadcrumb").textContent = "Scenario B → Redundancy that wasn't";
+    app.cy.fit(app.cy.elements(".trace-affected"), 80);
+  }
+  async function revealScenarioBConverge() {
+    var shared = await mockApi.getSharedDependencies(["prog_golf", "prog_id4"]);
+    clearTraceClasses();
+    app.cy.nodes().addClass("trace-unaffected"); app.cy.edges().addClass("trace-dim");
+    ["t3_paw", "part_paw_die", "part_brake_conti", "part_brake_bosch", "t1_continental", "t1_bosch", "prog_golf", "prog_id4"].forEach(function (id) {
+      var el = app.cy.getElementById(id);
+      if (el.length) el.removeClass("trace-unaffected").addClass((id === "t3_paw" || id === "part_paw_die") ? "convergence trace-affected" : "trace-affected");
+    });
+    app.cy.edges('[id = "e_die_bc"], [id = "e_die_bb"], [id = "e_paw_die"]').removeClass("trace-dim").addClass("convergence trace-path");
+    $("panel-empty").style.display = "none"; $("panel-content").style.display = "block"; $("panel-tabs").style.display = "none";
+    $("panel-title").textContent = "Hidden concentration";
+    $("panel-sub").textContent = "Dual-sourced at Tier-1 · single fab at Tier-3";
+    var headObj = shared.shared.filter(function (sx) { return sx.id === shared.headline; })[0] || shared.shared[0];
+    $("panel-content").innerHTML =
+      '<p style="font-size:12px;line-height:1.6;margin-bottom:14px">Brake Safety Controller is sourced from <strong>Continental</strong> and <strong>Bosch</strong> — but both dies are fabbed by <strong>' + (headObj ? headObj.name : "Pan-Asia Wafer") + "</strong>.</p>" +
+      '<div class="panel-section"><h3>Shared deep suppliers</h3>' + shared.shared.map(function (sx) { return '<div class="kv"><span>' + sx.name + "</span><span>Tier " + sx.tier + "</span></div>"; }).join("") + "</div>" +
+      '<p class="hint">Follow the orange convergence edges upstream from both controllers.</p>';
+    setInfo("Scenario B · " + shared.overlapCount + " shared deep suppliers · convergence at Pan-Asia Wafer");
+    app.cy.fit(app.cy.elements(".convergence, .trace-affected"), 80);
+    $("breadcrumb").textContent = "Scenario B → Redundancy that wasn't";
+  }
+
+  /* ── Guided scenario narration ────────────────────────── */
+  var SCENARIO_META = {
+    a: {
+      tag: "Scenario A", title: "One Chip, Two Platforms",
+      q: "If SilTech stops shipping, what production of ours stops — and when?",
+      why: "A no-name Tier-2 chip maker can silently halt finished cars. Not seeing these deep links is what made the 2021 chip crunch cost the industry roughly $210B.",
+      reveal: "Trace the chip's real part-by-part dependencies downstream and the graph lights up every program and plant it feeds — across the EV and combustion lines at once.",
+      aha: "One distressed supplier sits underneath both the future and the present of the product range."
+    },
+    b: {
+      tag: "Scenario B", title: "The Redundancy That Wasn't",
+      q: "We dual-sourced this safety controller across two suppliers — is that redundancy real?",
+      why: "\u201CDual-sourced\u201D on paper can still be a single factory deep down. The Renesas fab fire took out ~30% of the world's automotive chips from one building.",
+      reveal: "Trace both approved suppliers upstream and the two \u201Cindependent\u201D paths visibly converge on one shared foundry — Pan-Asia Wafer.",
+      aha: "Our backup and our primary are the same company one tier upstream."
+    },
+    c: {
+      tag: "Scenario C", title: "The Safe European Supplier",
+      q: "Our new European source is genuinely independent of the region we're leaving — right?",
+      why: "A European address is not European control. Nexperia (Dutch, Chinese-owned) became a supply crisis through its ownership structure alone — no factory failed.",
+      reveal: "Switch on the ownership overlay and both \u201Cindependent\u201D suppliers climb to the same ultimate parent — Hongqiao — one owner standing behind two addresses.",
+      aha: "We don't have two suppliers — we have one owner with two addresses."
+    }
+  };
+  var SCENARIO_STEPS = {
+    a: [
+      { head: "The alert fires", body: "A risk feed flags SilTech Malaysia \u2014 a Tier-2 chip maker \u2014 for a covenant breach (it has broken the terms of its bank loans, an early-warning sign of financial distress). Purchasing has never heard of it: we buy the finished part from Continental, so there is no SilTech contract anywhere in SAP. On a flat supplier list this is just a red score floating on its own, with no visible link to a single car we build. The obvious question \u2014 'does this actually affect us?' \u2014 has no answer in the systems we use today.", run: function () { clearTraceClasses(); if (app.ownershipOn) toggleOwnership(false); clearSelection(); app.cy.fit(undefined, 60); } },
+      { head: "Start at the true origin", body: "Selecting SilTech drops you at the real source of the risk, two tiers below anyone we hold a contract with. The graph already knows what flows out of it \u2014 which chips go into which assemblies, which assemblies into which vehicle programmes \u2014 because that lineage was mapped once and is kept current. So we can finally ask the question a table cannot: what does this unfamiliar name actually touch inside our business?", run: function () { clearTraceClasses(); selectNode("t2_siltech", { noFit: false }); } },
+      { head: "Trace the blast radius", body: "Trace forward and the exposure follows real, recorded dependencies rather than anyone's best guess. It fans out at once into the EV line (ID.4, ID.7) and the combustion line (Golf, Tiguan) \u2014 two parts of the business everyone assumed had nothing in common. This is the core move: one distressed supplier, every car it can stop, in a single picture.", run: function () { runTrace("t2_siltech"); } },
+      { head: "Turn it into a number", body: "Risk only drives decisions once it carries a number. The inspector on the right quantifies the exposure: how many programmes and plants are hit, the revenue at risk, and \u2014 using days-of-supply (how long a plant can keep building from stock on hand) \u2014 which line goes dark first. This is what turns 'a chip vendor wobbled' into 'Zwickau stops in 9 days' \u2014 the sentence that gets a mitigation budget approved.", run: function () { if (!app.trace) runTrace("t2_siltech"); } },
+      { head: "The honest control case", body: "Notice that not everything turns red. The green DC-DC converter path stays healthy because it is genuinely dual-sourced (Infineon and Renesas \u2014 no shared factory, no shared owner). Keeping one honestly-green path in the demo is deliberate: it shows the tool is reading the real structure of the chain, not painting everything red for effect. When this map says critical, you can trust it means it.", run: function () { if (!app.trace) runTrace("t2_siltech"); } }
+    ],
+    b: [
+      { head: "The question", body: "The brake safety controller is a part we cannot afford to lose, so it was deliberately split across two Tier-1s \u2014 Continental and Bosch \u2014 on the principle that no single failure should ever stop the line. We pay more to carry two suppliers precisely to buy that resilience. This scenario answers the uncomfortable question: is the redundancy we are paying for actually real, or only real on paper?", run: function () { revealScenarioBSeparate(); } },
+      { head: "Two paths, drawn separately", body: "At the contract level it looks textbook: two approved vendors, two part numbers, two purchase agreements, a clean green 'dual-sourced' status in every report. On the map each controller traces upstream as its own separate, independent branch \u2014 exactly the picture our current systems would paint, because that is as deep as our contracts can see.", run: function () { revealScenarioBSeparate(); } },
+      { head: "Watch them converge", body: "Now keep following both branches further up the chain, past the tier where our contracts stop. One level deeper, the two 'independent' paths bend toward each other and meet at a single foundry \u2014 Pan-Asia Wafer \u2014 which fabricates the silicon die inside both Continental's and Bosch's controllers. The redundancy quietly disappears at a layer nobody was looking at.", run: function () { revealScenarioBConverge(); } },
+      { head: "The redundancy that wasn't", body: "Our primary and our backup are the same company one tier upstream, so a single fire or shutdown at that one fab takes out both at once \u2014 and with them every programme the controller feeds, across more than one plant. The graph surfaces a dependency that lived entirely below our data. This is not hypothetical: the 2021 Renesas fab fire knocked out roughly a third of the world's automotive chips from a single building.", run: function () { revealScenarioBConverge(); } }
+    ],
+    c: [
+      { head: "A textbook de-risking move", body: "After the SilTech scare, purchasing does exactly what good practice demands: it qualifies a European alternative, Veldhoven Semiconductors, to cut dependence on the high-risk region. Every field a supplier table checks comes back reassuring \u2014 country Netherlands, EU region, low geopolitical risk. By the only measures our systems hold, the de-risking looks complete and the file gets closed.", run: function () { clearTraceClasses(); if (app.ownershipOn) toggleOwnership(false); app.inspectorTab = "overview"; selectNode("t2_veldhoven", { noFit: false }); } },
+      { head: "Switch on the ownership overlay", body: "But country of address tells you where a company sits, not who controls it \u2014 and ownership data normally lives in a separate system that is never joined to part data. Turn the ownership overlay on and the graph draws that missing layer: control lines climb upward from both Veldhoven and the original Asian source SilTech, through intermediate holding companies, toward whoever ultimately owns them.", run: async function () { if (!app.ownershipOn) await toggleOwnership(true); app.cy.fit(app.cy.nodes('[ultimateParentId = "parent_hongqiao"], #parent_hongqiao, #t2_veldhoven, #t2_siltech'), 80); } },
+      { head: "One owner, two addresses", body: "Both roll up to the same ultimate parent \u2014 Hongqiao Tech Holdings, an entity-listed group based in the very region we were trying to move away from. The diversification was an illusion: this time the hidden link is not a shared factory but a shared owner. We do not have two suppliers; we have one owner with two addresses \u2014 a risk no spreadsheet of countries would ever catch. (Compare Nexperia: Dutch-registered, Chinese-owned, a genuine supply crisis driven by ownership alone.)", run: async function () { if (!app.ownershipOn) await toggleOwnership(true); showOwnershipPanel(); app.cy.fit(app.cy.nodes('[ultimateParentId = "parent_hongqiao"], #parent_hongqiao, #t2_veldhoven, #t2_siltech'), 80); } }
+    ]
+  };
+
+  function startScenario(key) {
+    if (!SCENARIO_STEPS[key]) return;
+    closeWelcome();
+    endTour();
+    app.scenarioKey = key;
+    app.scenarioStep = 0;
+    $("scenario-coach").classList.add("show");
+    runScenarioStep(0);
+  }
+  function runScenarioStep(i) {
+    var steps = SCENARIO_STEPS[app.scenarioKey]; if (!steps) return;
+    i = Math.max(0, Math.min(i, steps.length - 1));
+    app.scenarioStep = i;
+    var step = steps[i];
+    if (step.run) { try { step.run(); } catch (e) { console.error(e); } }
+    renderScenarioCoach();
+  }
+  function renderScenarioCoach() {
+    var steps = SCENARIO_STEPS[app.scenarioKey]; if (!steps) return;
+    var i = app.scenarioStep, step = steps[i], meta = SCENARIO_META[app.scenarioKey];
+    $("sc-title").textContent = meta.tag + " · " + meta.title;
+    $("sc-step").textContent = "Step " + (i + 1) + " of " + steps.length;
+    $("sc-head").textContent = step.head;
+    $("sc-body").textContent = step.body;
+    $("sc-dots").innerHTML = steps.map(function (s, idx) { return '<span class="sc-dot' + (idx <= i ? " on" : "") + '"></span>'; }).join("");
+    $("sc-back").disabled = (i === 0);
+    $("sc-next").textContent = (i === steps.length - 1) ? "Done" : "Next";
+  }
+  function closeScenarioCoach() { $("scenario-coach").classList.remove("show"); app.scenarioKey = null; }
+
+  /* ── Welcome overlay ──────────────────────────────────── */
+  var WELCOME_KEY = "ge_welcome_dismissed";
+  function welcomeDismissed() { try { return !!localStorage.getItem(WELCOME_KEY); } catch (e) { return false; } }
+  function setWelcomeDismissed(on) { try { if (on) localStorage.setItem(WELCOME_KEY, "1"); else localStorage.removeItem(WELCOME_KEY); } catch (e) { /* ignore */ } }
+  function renderWelcomeCards() {
+    $("welcome-cards").innerHTML = ["a", "b", "c"].map(function (k) {
+      var m = SCENARIO_META[k];
+      return '<button type="button" class="wcard" data-scn="' + k + '">' +
+        '<span class="wtag">' + m.tag + "</span>" +
+        "<h3>" + m.title + "</h3>" +
+        '<div class="wq">&ldquo;' + m.q + '&rdquo;</div>' +
+        '<div class="wblock"><span class="wlabel">Why it matters</span>' + m.why + "</div>" +
+        '<div class="wblock"><span class="wlabel">How the graph reveals it</span>' + m.reveal + "</div>" +
+        '<div class="waha"><strong>The &ldquo;oh&rdquo;:</strong> ' + m.aha + "</div>" +
+        '<div class="wgo">Walk me through it →</div>' +
+        "</button>";
+    }).join("");
+    $("welcome-cards").querySelectorAll(".wcard").forEach(function (el) {
+      el.addEventListener("click", function () { startScenario(el.dataset.scn); });
+    });
+  }
+  function openWelcome() { renderWelcomeCards(); $("welcome-dismiss").checked = welcomeDismissed(); $("welcome-overlay").classList.add("show"); }
+  function closeWelcome() { $("welcome-overlay").classList.remove("show"); }
+
+  /* ── Interactive panel tour (coach marks) ─────────────── */
+  var TOUR_STEPS = [
+    { sel: "#toolbar", title: "Toolbar & global search", body: "Search any supplier, part or program by name, and reach the big actions — Concentration, Ownership, Views and Export — from here.", place: "bottom" },
+    { sel: "#filter-panel", title: "Filters & visibility layers", body: "Narrow the map by tier, risk, geography, program/plant or commodity, and switch on focus layers like ownership chains or financial-risk paths.", place: "right", before: function () { $("filter-panel").classList.remove("collapsed"); $("btn-filters").classList.add("active"); } },
+    { sel: "#scenario-bar", title: "The three guided scenarios", body: "Each button replays a story the connected map can answer but a table can't. Pick one and a step-by-step guide walks you through the reveal.", place: "bottom" },
+    { sel: "#cy", title: "The supply network map", body: "Every supplier, part, plant and program is a point; lines are the dependencies between them. Shape shows what an entity is; colour and glow show how risky it is.", place: "center" },
+    { sel: "#legend", title: "Reading the map", body: "The key decodes it: border colour is risk level (red = critical down to blue = low), and each shape is a different entity type.", place: "top" },
+    { sel: "#bottom-right", title: "Layout & zoom", body: "Switch between Hierarchy, Force and Geographic layouts, and zoom or fit the whole network to the screen.", place: "left" },
+    { sel: "#panel", title: "The inspector", body: "Selecting anything fills this panel: overview, supply path, ownership chain, risk signals and alert history. Tracing impact shows the blast radius and the revenue at risk.", place: "left" }
+  ];
+  function startTour() {
+    closeWelcome();
+    closeScenarioCoach();
+    app.tourStep = 0;
+    app._filterCollapsedBeforeTour = $("filter-panel").classList.contains("collapsed");
+    $("tour-layer").classList.add("show");
+    showTourStep(0);
+  }
+  function showTourStep(i) {
+    i = Math.max(0, Math.min(i, TOUR_STEPS.length - 1));
+    app.tourStep = i;
+    var step = TOUR_STEPS[i];
+    if (step.before) step.before();
+    $("tour-title").textContent = step.title;
+    $("tour-body").textContent = step.body;
+    $("tour-count").textContent = "Step " + (i + 1) + " of " + TOUR_STEPS.length;
+    $("tour-back").disabled = (i === 0);
+    $("tour-next").textContent = (i === TOUR_STEPS.length - 1) ? "Done" : "Next";
+    positionTour();
+    setTimeout(positionTour, 260);
+  }
+  function positionTour() {
+    if (!$("tour-layer").classList.contains("show")) return;
+    var step = TOUR_STEPS[app.tourStep]; if (!step) return;
+    var el = document.querySelector(step.sel); if (!el) return;
+    var r = el.getBoundingClientRect();
+    var sp = $("tour-spotlight"), tip = $("tour-tooltip");
+    var pad = 6;
+    sp.style.left = (r.left - pad) + "px";
+    sp.style.top = (r.top - pad) + "px";
+    sp.style.width = (r.width + pad * 2) + "px";
+    sp.style.height = (r.height + pad * 2) + "px";
+    var tw = tip.offsetWidth, th = tip.offsetHeight, gap = 16, m = 12;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var place = step.place || "bottom";
+    function fits(p) {
+      if (p === "right") return r.right + gap + tw <= vw - m;
+      if (p === "left") return r.left - gap - tw >= m;
+      if (p === "top") return r.top - gap - th >= m;
+      if (p === "bottom") return r.bottom + gap + th <= vh - m;
+      return true;
+    }
+    // If the preferred side would push the card off the page, flip to the opposite side.
+    var opposite = { right: "left", left: "right", top: "bottom", bottom: "top" };
+    if (place !== "center" && !fits(place) && fits(opposite[place])) place = opposite[place];
+    var left, top;
+    if (place === "center") { left = (vw - tw) / 2; top = Math.max(72, (vh - th) / 2 - 110); }
+    else if (place === "right") { left = r.right + gap; top = r.top; }
+    else if (place === "left") { left = r.left - tw - gap; top = r.top; }
+    else if (place === "top") { left = r.left; top = r.top - th - gap; }
+    else { left = r.left; top = r.bottom + gap; }
+    // For side placements (e.g. full-height filter/inspector panels) centre vertically on the target.
+    if (place === "right" || place === "left") top = r.top + (r.height - th) / 2;
+    left = Math.max(m, Math.min(left, vw - tw - m));
+    top = Math.max(m, Math.min(top, vh - th - m));
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+  }
+  function endTour() {
+    if (!$("tour-layer").classList.contains("show")) return;
+    $("tour-layer").classList.remove("show");
+    if (app._filterCollapsedBeforeTour) { $("filter-panel").classList.add("collapsed"); $("btn-filters").classList.remove("active"); }
   }
 
   /* ── Filters ──────────────────────────────────────────── */
@@ -1076,19 +1391,15 @@ button { font-family: inherit; }
     var d = app.cy.getElementById(id).data();
     var bub = $("action-bubble");
     var btns = [];
-    if (d.type === "supplier" || d.type === "part") btns.push('<button class="ab" data-act="trace">Trace</button>');
-    btns.push('<button class="ab" data-act="expand">Expand</button>');
-    if (d.ultimateParentId) btns.push('<button class="ab" data-act="own">Ownership</button>');
-    btns.push('<button class="ab" data-act="hide">Hide</button>');
+    if (d.type === "supplier" || d.type === "part") btns.push('<button class="ab" data-act="trace">Trace impact</button>');
+    if (d.ultimateParentId) btns.push('<button class="ab" data-act="own">Show owner</button>');
     bub.innerHTML = btns.join("");
     bub.querySelectorAll(".ab").forEach(function (b) {
       b.addEventListener("click", function (e) {
         e.stopPropagation();
         var a = b.dataset.act;
         if (a === "trace") runTrace(id);
-        else if (a === "expand") { app.cy.getElementById(id).neighborhood().removeClass("hidden dim"); updateCounts(); }
         else if (a === "own") { toggleOwnership(true); }
-        else if (a === "hide") { app.cy.getElementById(id).addClass("hidden"); bub.classList.remove("show"); updateCounts(); }
       });
     });
     bub.classList.add("show");
@@ -1196,20 +1507,24 @@ button { font-family: inherit; }
   }
 
   /* ── Saved views (Q · FR-13) ──────────────────────────── */
-  async function buildViewsMenu() {
-    var v = await mockApi.listViews();
+  function buildViewsMenu() {
+    var mine = [];
+    try { mine = JSON.parse(localStorage.getItem("ge_my_views") || "[]"); } catch (e) { mine = []; }
+    var system = (typeof SYSTEM_VIEWS !== "undefined" && SYSTEM_VIEWS) ? SYSTEM_VIEWS : (window.SYSTEM_VIEWS || []);
     var html = "";
-    html += '<div class="mi" data-view="__save">Save current view…<small>Stored in this browser</small></div><div class="menu-sep"></div>';
-    v.system.forEach(function (s) { html += '<div class="mi" data-view="sys:' + s.id + '">' + s.name + "<small>System view</small></div>"; });
-    if (v.mine.length) { html += '<div class="menu-sep"></div>'; v.mine.forEach(function (s) { html += '<div class="mi" data-view="my:' + s.id + '">' + s.name + "<small>My view</small></div>"; }); }
+    html += '<div class="mi" data-view="__save"><span class="mi-name">Save current view…</span><small>Stored in this browser</small></div><div class="menu-sep"></div>';
+    html += '<div class="menu-label">System views</div>';
+    system.forEach(function (s) { html += '<div class="mi" data-view="sys:' + s.id + '"><span class="mi-name">' + s.name + '</span><small>System view</small></div>'; });
+    if (mine.length) { html += '<div class="menu-sep"></div><div class="menu-label">My views</div>'; mine.forEach(function (s) { html += '<div class="mi" data-view="my:' + s.id + '"><span class="mi-name">' + s.name + '</span><small>My view</small></div>'; }); }
     $("views-menu").innerHTML = html;
     $("views-menu").querySelectorAll(".mi").forEach(function (el) {
-      el.addEventListener("click", function () {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
         $("views-menu").classList.remove("open");
         var val = el.dataset.view;
         if (val === "__save") saveCurrentView();
-        else if (val.indexOf("sys:") === 0) applySystemView(v.system.find(function (s) { return s.id === val.slice(4); }));
-        else applySystemView(v.mine.find(function (s) { return s.id === val.slice(3); }));
+        else if (val.indexOf("sys:") === 0) applySystemView(system.find(function (s) { return s.id === val.slice(4); }));
+        else applySystemView(mine.find(function (s) { return s.id === val.slice(3); }));
       });
     });
   }
@@ -1221,11 +1536,19 @@ button { font-family: inherit; }
     if (fl.risk_type) fl.risk_type.forEach(function (r) { app.filters.riskType.add(r); markChip("riskType", r); });
     if (fl.country) fl.country.forEach(function (r) { app.filters.country.add(r); markChip("country", r); });
     if (fl.commodity) fl.commodity.forEach(function (r) { app.filters.commodity.add(r); markChip("commodity", r); });
+    if (fl.program) fl.program.forEach(function (id) { var nm = idToName(id); app.filters.program.add(nm); markChip("program", nm); });
+    if (fl.plant) fl.plant.forEach(function (id) { var nm = idToName(id); app.filters.plant.add(nm); markChip("plant", nm); });
     if (fl.spof_only) { app.filters.spofOnly = true; var sp = $("f-spof"); if (sp) sp.checked = true; }
     if (fl.lksg) { app.filters.lksgOnly = true; var lk = $("f-lksg"); if (lk) lk.checked = true; }
-    if (view.layers && view.layers.ownership) toggleOwnership(true);
+    if (view.layers && view.layers.ownership && !app.ownershipOn) toggleOwnership(true);
     applyFilters();
-    if (view.focus && app.cy.getElementById(view.focus).length) selectNode(view.focus);
+    // Keep the view's focus visible even if the view's own filters would hide it,
+    // so applying a view never lands the user on an empty/near-empty canvas.
+    var fn = view.focus ? app.cy.getElementById(view.focus) : null;
+    if (fn && fn.length && fn.hasClass("hidden")) { fn.removeClass("hidden"); updateCounts(); }
+    var vis = app.cy.nodes().not(".hidden");
+    if (vis.length) app.cy.fit(vis, 60);
+    if (fn && fn.length) selectNode(view.focus, { noFit: true });
     toast("Applied view: " + view.name);
   }
   function markChip(group, val) { var c = $("filter-body").querySelector('.fchip[data-group="' + group + '"][data-val="' + val + '"]'); if (c) c.classList.add("on"); }
@@ -1264,7 +1587,7 @@ button { font-family: inherit; }
   function copyLink() { writeHash(); var url = location.href; if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast("Share link copied"); }, function () { toast(url); }); else toast(url); }
   function togglePresent() {
     app.present = !app.present;
-    document.querySelectorAll("#scenario-bar, #legend, #bottom-right, #spof-banner, #active-chips").forEach(function (el) { el.style.visibility = app.present ? "hidden" : ""; });
+    document.querySelectorAll("#scenario-bar, #legend, #bottom-right, #spof-banner, #active-chips, #scenario-coach").forEach(function (el) { el.style.visibility = app.present ? "hidden" : ""; });
     toast(app.present ? "Present mode — Esc to exit" : "Present mode off");
   }
 
@@ -1284,10 +1607,28 @@ button { font-family: inherit; }
   $("zoom-out").addEventListener("click", function () { app.cy.zoom(app.cy.zoom() / 1.2); });
   $("zoom-fit").addEventListener("click", function () { app.cy.fit(undefined, 60); });
   document.querySelectorAll("#layout-switch button").forEach(function (b) { b.addEventListener("click", function () { applyLayout(b.dataset.layout); }); });
-  document.querySelectorAll(".scenario-btn").forEach(function (b) { b.addEventListener("click", function () { runScenario(b.dataset.scenario); }); });
+  document.querySelectorAll(".scenario-btn").forEach(function (b) { b.addEventListener("click", function () { startScenario(b.dataset.scenario); }); });
   $("search").addEventListener("input", function (e) { debounceSearch(e.target.value); });
 
-  $("btn-views").addEventListener("click", function (e) { e.stopPropagation(); buildViewsMenu(); $("views-menu").classList.toggle("open"); $("export-menu").classList.remove("open"); });
+  $("btn-guide").addEventListener("click", openWelcome);
+  $("welcome-explore").addEventListener("click", function () { setWelcomeDismissed($("welcome-dismiss").checked); closeWelcome(); });
+  $("welcome-tour").addEventListener("click", function () { setWelcomeDismissed($("welcome-dismiss").checked); startTour(); });
+  $("welcome-dismiss").addEventListener("change", function (e) { setWelcomeDismissed(e.target.checked); });
+  $("welcome-overlay").addEventListener("click", function (e) { if (e.target === $("welcome-overlay")) closeWelcome(); });
+  $("tour-next").addEventListener("click", function () { if (app.tourStep >= TOUR_STEPS.length - 1) endTour(); else showTourStep(app.tourStep + 1); });
+  $("tour-back").addEventListener("click", function () { showTourStep(app.tourStep - 1); });
+  $("sc-next").addEventListener("click", function () { var steps = SCENARIO_STEPS[app.scenarioKey]; if (!steps) return; if (app.scenarioStep >= steps.length - 1) closeScenarioCoach(); else runScenarioStep(app.scenarioStep + 1); });
+  $("sc-back").addEventListener("click", function () { runScenarioStep(app.scenarioStep - 1); });
+  $("sc-close").addEventListener("click", closeScenarioCoach);
+  window.addEventListener("resize", positionTour);
+
+  $("btn-views").addEventListener("click", function (e) {
+    e.stopPropagation();
+    $("export-menu").classList.remove("open");
+    var willOpen = !$("views-menu").classList.contains("open");
+    buildViewsMenu();
+    $("views-menu").classList.toggle("open", willOpen);
+  });
   $("btn-export").addEventListener("click", function (e) { e.stopPropagation(); $("export-menu").classList.toggle("open"); $("views-menu").classList.remove("open"); });
   $("export-menu").querySelectorAll(".mi").forEach(function (el) { el.addEventListener("click", function () { $("export-menu").classList.remove("open"); var a = el.dataset.export; if (a === "png") exportPng(); else if (a === "link") copyLink(); else togglePresent(); }); });
   document.addEventListener("click", function () { $("views-menu").classList.remove("open"); $("export-menu").classList.remove("open"); hideCtx(); });
@@ -1298,7 +1639,10 @@ button { font-family: inherit; }
     if ((e.ctrlKey || e.metaKey) && e.key === "f") { e.preventDefault(); $("btn-filters").click(); }
     if (e.shiftKey && (e.key === "D" || e.key === "d")) { e.preventDefault(); broadcast(); }
     if (e.key === "Escape") {
+      if ($("tour-layer").classList.contains("show")) { endTour(); return; }
+      if ($("welcome-overlay").classList.contains("show")) { closeWelcome(); return; }
       if (app.present) { togglePresent(); return; }
+      if ($("scenario-coach").classList.contains("show")) { closeScenarioCoach(); }
       clearTraceFull();
       $("alert-drawer").classList.remove("open");
       $("search-results").classList.remove("open");
@@ -1315,7 +1659,7 @@ button { font-family: inherit; }
     var hasDagre = false;
     try { cytoscape({ headless: true }).layout({ name: "dagre" }); hasDagre = true; } catch (e) { hasDagre = false; }
     if (!hasDagre) { loader.textContent = "dagre layout failed to load (cytoscape-dagre CDN blocked). Check network and reload."; return; }
-    try { initCy(); refreshAlerts(); }
+    try { initCy(); refreshAlerts(); if (!welcomeDismissed()) openWelcome(); }
     catch (err) { loader.classList.remove("hidden"); loader.textContent = "Init error: " + (err && err.message ? err.message : err); console.error(err); }
   }
   boot();
