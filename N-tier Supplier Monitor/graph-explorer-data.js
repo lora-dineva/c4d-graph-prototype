@@ -332,4 +332,6 @@ if (typeof window !== "undefined") {
   window.GRAPH = GRAPH; window.ALERTS = ALERTS; window.ALERT_HISTORY = ALERT_HISTORY;
   window.SYSTEM_VIEWS = SYSTEM_VIEWS; window.SCENARIOS = SCENARIOS;
   window.TIER_RANK = TIER_RANK; window.rankOf = rankOf;
+  window.ACTIVE_GRAPH = GRAPH;
+  window.ACTIVE_USE_CASE = "semiconductor";
 }
